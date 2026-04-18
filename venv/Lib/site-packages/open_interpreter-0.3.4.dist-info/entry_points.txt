@@ -1,0 +1,5 @@
+[console_scripts]
+i=interpreter.terminal_interface.start_terminal_interface:main
+ibench=benchmarks.simple:main
+interpreter=interpreter.terminal_interface.start_terminal_interface:main
+
