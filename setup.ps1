@@ -1,6 +1,6 @@
-﻿# setup.ps1 — JARVIS2
+﻿# setup.ps1 â€” JARVIS2
 # Uso: git clone <repo> && cd <repo> && .\setup.ps1
-# Levanta el sistema completo en máquina limpia sin pasos manuales.
+# Levanta el sistema completo en maquina limpia sin pasos manuales.
 
 $ErrorActionPreference = "Stop"
 $root = $PSScriptRoot
@@ -9,38 +9,120 @@ function Check-Command($cmd) {
     return [bool](Get-Command $cmd -ErrorAction SilentlyContinue)
 }
 
-Write-Host "`n=== JARVIS2 SETUP ===" -ForegroundColor Cyan
+Write-Host "`n==== JARVIS2 SETUP ====" -ForegroundColor Cyan
 
-# ——————————————————————————
-# 1. PRECONDICIONES
-# ——————————————————————————
-Write-Host "`n[1/7] Verificando precondiciones..." -ForegroundColor Yellow
+# â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”
+# 0. WINGET
+# â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”
+Write-Host "`n[0/7] Verificando winget..." -ForegroundColor Yellow
+if (-not (Check-Command winget)) {
+    Write-Host ""
+    Write-Host "  ERROR: winget no encontrado en este sistema." -ForegroundColor Red
+    Write-Host "  Sin winget no se pueden instalar dependencias automaticamente." -ForegroundColor Red
+    Write-Host "  Solucion: instala 'App Installer' desde Microsoft Store y vuelve a ejecutar setup.ps1." -ForegroundColor Yellow
+    Write-Host ""
+    Read-Host "  Pulsa Enter para salir"
+    exit 1
+}
+Write-Host "    OK â€” winget disponible" -ForegroundColor Green
 
-# PowerShell 7+
+# â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”
+# 1. POWERSHELL 7
+# â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”
+Write-Host "`n[1/7] Verificando PowerShell 7..." -ForegroundColor Yellow
 if ($PSVersionTable.PSVersion.Major -lt 7) {
-    Write-Error "Se requiere PowerShell 7 o superior. Versión detectada: $($PSVersionTable.PSVersion)"
+    $pwshPath = (Get-Command pwsh -ErrorAction SilentlyContinue)
+    if ($pwshPath) {
+        $pwshExe = $pwshPath.Source
+        Write-Host "    PowerShell 7 disponible. Relanzando en pwsh.exe..." -ForegroundColor Gray
+    } else {
+        Write-Host "    PowerShell 7 no encontrado. Instalando via winget (obligatorio)..." -ForegroundColor Gray
+        winget install Microsoft.PowerShell --silent --accept-source-agreements --accept-package-agreements
+        # Refrescar PATH en sesion actual
+        $env:Path = [System.Environment]::GetEnvironmentVariable("Path","Machine") + ";" + [System.Environment]::GetEnvironmentVariable("Path","User")
+        $pwshPath = (Get-Command pwsh -ErrorAction SilentlyContinue)
+        if (-not $pwshPath) {
+            Write-Host ""
+            Write-Host "  ERROR: Instalacion de PowerShell 7 fallida." -ForegroundColor Red
+            Write-Host "  Instala manualmente desde https://aka.ms/PSWindows y vuelve a ejecutar setup.ps1." -ForegroundColor Yellow
+            Read-Host "  Pulsa Enter para salir"
+            exit 1
+        }
+        $pwshExe = $pwshPath.Source
+        Write-Host "    OK â€” PowerShell 7 instalado" -ForegroundColor Green
+    }
+    # Relancar este mismo script en PS7 y terminar instancia PS5
+    Start-Process $pwshExe -ArgumentList "-NoExit -ExecutionPolicy Bypass -File `"$PSCommandPath`"" -Wait
+    exit
+}
+Write-Host "    OK â€” PS $($PSVersionTable.PSVersion)" -ForegroundColor Green
+
+# â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”
+# 1B. PYTHON 3.10+
+# â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”
+Write-Host "`n    Verificando Python 3.10+..." -ForegroundColor Yellow
+$pythonOk = $false
+if (Check-Command python) {
+    $pyVersion = python -c "import sys; print(f'{sys.version_info.major}.{sys.version_info.minor}')"
+    if ([version]$pyVersion -ge [version]"3.10") {
+        $pythonOk = $true
+        Write-Host "    OK â€” Python $pyVersion" -ForegroundColor Green
+    } else {
+        Write-Host "    Python $pyVersion detectado â€” se requiere 3.10+. Instalando..." -ForegroundColor Gray
+    }
+}
+if (-not $pythonOk) {
+    Write-Host "    Python 3.10 no encontrado. Instalando via winget (obligatorio)..." -ForegroundColor Gray
+    winget install Python.Python.3.10 --silent --accept-source-agreements --accept-package-agreements
+    $env:Path = [System.Environment]::GetEnvironmentVariable("Path","Machine") + ";" + [System.Environment]::GetEnvironmentVariable("Path","User")
+    if (-not (Check-Command python)) {
+        Write-Host ""
+        Write-Host "  ERROR: Instalacion de Python 3.10 fallida." -ForegroundColor Red
+        Write-Host "  Instala manualmente desde https://www.python.org/downloads/release/python-31011/ y vuelve a ejecutar." -ForegroundColor Yellow
+        Read-Host "  Pulsa Enter para salir"
+        exit 1
+    }
+    Write-Host "    OK â€” Python instalado" -ForegroundColor Green
 }
 
-# Python 3.10+
-if (-not (Check-Command python)) { Write-Error "Python no encontrado en el PATH." }
-$pyVersion = python -c "import sys; print(f'{sys.version_info.major}.{sys.version_info.minor}')"
-if ([version]$pyVersion -lt [version]"3.10") { Write-Error "Se requiere Python 3.10+. Detectado: $pyVersion" }
+# â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”
+# 1C. GIT
+# â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”
+Write-Host "`n    Verificando Git..." -ForegroundColor Yellow
+if (-not (Check-Command git)) {
+    Write-Host "    Git no encontrado. Instalando via winget (obligatorio)..." -ForegroundColor Gray
+    winget install Git.Git --silent --accept-source-agreements --accept-package-agreements
+    $env:Path = [System.Environment]::GetEnvironmentVariable("Path","Machine") + ";" + [System.Environment]::GetEnvironmentVariable("Path","User")
+    if (-not (Check-Command git)) {
+        Write-Host ""
+        Write-Host "  ERROR: Instalacion de Git fallida." -ForegroundColor Red
+        Write-Host "  Instala manualmente desde https://git-scm.com/download/win y vuelve a ejecutar." -ForegroundColor Yellow
+        Read-Host "  Pulsa Enter para salir"
+        exit 1
+    }
+    Write-Host "    OK â€” Git instalado" -ForegroundColor Green
+} else {
+    Write-Host "    OK â€” $(git --version)" -ForegroundColor Green
+}
 
-# Git
-if (-not (Check-Command git)) { Write-Error "Git no encontrado en el PATH." }
-
-# Espacio en disco (12 GB mínimo)
-$drive = Split-Path -Qualifier $root
+# â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”
+# 1D. ESPACIO EN DISCO (12 GB minimo)
+# â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”
+Write-Host "`n    Verificando espacio en disco..." -ForegroundColor Yellow
+$drive = Split-Path $root -Qualifier
 $freeGB = [math]::Round((Get-PSDrive ($drive.TrimEnd(':'))).Free / 1GB, 1)
-if ($freeGB -lt 12) { Write-Error "Espacio insuficiente en disco. Disponible: ${freeGB} GB. Mínimo: 12 GB." }
+if ($freeGB -lt 12) {
+    Write-Host ""
+    Write-Host "  ERROR: Espacio insuficiente. Disponible: $freeGB GB. Minimo: 12 GB." -ForegroundColor Red
+    Read-Host "  Pulsa Enter para salir"
+    exit 1
+}
+Write-Host "    OK â€” Disco libre: $freeGB GB" -ForegroundColor Green
 
-Write-Host "    OK — PS $($PSVersionTable.PSVersion), Python $pyVersion, Git OK, Disco libre: ${freeGB} GB" -ForegroundColor Green
-
-# ——————————————————————————
+# â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”
 # 2. ESTRUCTURA DE CARPETAS
-# ——————————————————————————
+# â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”
 Write-Host "`n[2/7] Verificando estructura de carpetas..." -ForegroundColor Yellow
-
 $folders = @("logs", "memoria", "sandbox", "skills", "config")
 foreach ($f in $folders) {
     $path = Join-Path $root $f
@@ -51,32 +133,35 @@ foreach ($f in $folders) {
 }
 Write-Host "    OK" -ForegroundColor Green
 
-# ——————————————————————————
+# â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”
 # 3. OLLAMA
-# ——————————————————————————
+# â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”
 Write-Host "`n[3/7] Verificando Ollama..." -ForegroundColor Yellow
-
 if (-not (Check-Command ollama)) {
     Write-Host "    Ollama no encontrado. Instalando via winget..." -ForegroundColor Gray
-    winget install Ollama.Ollama --silent
-    # Refrescar PATH
+    winget install Ollama.Ollama --silent --accept-source-agreements --accept-package-agreements
     $env:Path = [System.Environment]::GetEnvironmentVariable("Path","Machine") + ";" + [System.Environment]::GetEnvironmentVariable("Path","User")
-    if (-not (Check-Command ollama)) { Write-Error "Instalación de Ollama fallida. Instálalo manualmente desde https://ollama.com" }
+    if (-not (Check-Command ollama)) {
+        Write-Host ""
+        Write-Host "  ERROR: Instalacion de Ollama fallida. Instalalo manualmente desde https://ollama.com" -ForegroundColor Red
+        Read-Host "  Pulsa Enter para salir"
+        exit 1
+    }
 }
-Write-Host "    OK — $(ollama --version)" -ForegroundColor Green
+Write-Host "    OK â€” $(ollama --version)" -ForegroundColor Green
 
-# ——————————————————————————
+# â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”
 # 4. MODELO
-# ——————————————————————————
+# â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”
 Write-Host "`n[4/7] Verificando modelo..." -ForegroundColor Yellow
 
 $modelList = ollama list 2>&1
 
 $modelos = @(
-    [PSCustomObject]@{ Nombre = "qwen2.5:7b-instruct-q5_K_M"; Tamanio = "5.4GB"; Descripcion = "Recomendado — equilibrado" },
-    [PSCustomObject]@{ Nombre = "qwen2.5:3b-instruct";        Tamanio = "2.1GB"; Descripcion = "Ligero, menos capaz" },
-    [PSCustomObject]@{ Nombre = "llama3.2:3b";                Tamanio = "2.0GB"; Descripcion = "Alternativa ligera" },
-    [PSCustomObject]@{ Nombre = "MANUAL";                     Tamanio = "—";     Descripcion = "Introducir nombre manualmente" }
+    [PSCustomObject]@{ Nombre = "qwen2.5:7b-instruct-q5_K_M"; Tamano = "5.4GB"; Descripcion = "Recomendado â€” equilibrado" },
+    [PSCustomObject]@{ Nombre = "qwen2.5:3b-instruct";        Tamano = "2.1GB"; Descripcion = "Ligero, menos capaz" },
+    [PSCustomObject]@{ Nombre = "llama3.2:3b";                Tamano = "2.0GB"; Descripcion = "Alternativa ligera" },
+    [PSCustomObject]@{ Nombre = "MANUAL";                     Tamano = "-";     Descripcion = "Introducir nombre manualmente" }
 )
 
 $modeloInstalado = $null
@@ -88,35 +173,35 @@ foreach ($m in $modelos | Where-Object { $_.Nombre -ne "MANUAL" }) {
 }
 
 if ($modeloInstalado) {
-    Write-Host "    OK — modelo presente: $modeloInstalado" -ForegroundColor Green
+    Write-Host "    OK â€” modelo presente: $modeloInstalado" -ForegroundColor Green
     $modeloSeleccionado = $modeloInstalado
 } else {
-    Write-Host "`n    No se detectó ningún modelo instalado. Selecciona uno:`n" -ForegroundColor Yellow
+    Write-Host "    No se detecto ningun modelo instalado. Selecciona uno:`n" -ForegroundColor Yellow
     for ($i = 0; $i -lt $modelos.Count; $i++) {
-        Write-Host "    $($i+1). $($modelos[$i].Nombre)  [$($modelos[$i].Tamanio)]  — $($modelos[$i].Descripcion)" -ForegroundColor White
+        Write-Host "    $($i+1). $($modelos[$i].Nombre)  [$($modelos[$i].Tamano)] â€” $($modelos[$i].Descripcion)" -ForegroundColor White
     }
     Write-Host ""
-    $seleccion = Read-Host "    Opción (1-4)"
+    $seleccion = Read-Host "    Opcion (1-4)"
     switch ($seleccion) {
         "1" { $modeloSeleccionado = $modelos[0].Nombre }
         "2" { $modeloSeleccionado = $modelos[1].Nombre }
         "3" { $modeloSeleccionado = $modelos[2].Nombre }
         "4" { $modeloSeleccionado = Read-Host "    Nombre del modelo (ej: mistral:7b)" }
-        default { Write-Error "Opción no válida." }
+        default { Write-Error "Opcion no valida." }
     }
     Write-Host "    Descargando $modeloSeleccionado..." -ForegroundColor Gray
     ollama pull $modeloSeleccionado
-    Write-Host "    OK — modelo instalado: $modeloSeleccionado" -ForegroundColor Green
+    Write-Host "    OK â€” modelo instalado: $modeloSeleccionado" -ForegroundColor Green
 }
 
-# ——————————————————————————
+# â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”
 # 5. ENTORNO VIRTUAL PYTHON
-# ——————————————————————————
+# â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”
 Write-Host "`n[5/7] Verificando entorno virtual..." -ForegroundColor Yellow
 
-$venvPath = Join-Path $root "venv"
+$venvPath     = Join-Path $root "venv"
 $venvActivate = Join-Path $venvPath "Scripts\Activate.ps1"
-$venvPython = Join-Path $venvPath "Scripts\python.exe"
+$venvPython   = Join-Path $venvPath "Scripts\python.exe"
 
 if (-not (Test-Path $venvPython)) {
     Write-Host "    venv no encontrado o corrupto. Reconstruyendo..." -ForegroundColor Gray
@@ -125,25 +210,25 @@ if (-not (Test-Path $venvPython)) {
 }
 Write-Host "    OK" -ForegroundColor Green
 
-# ——————————————————————————
+# â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”
 # 6. OPEN INTERPRETER
-# ——————————————————————————
+# â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”
 Write-Host "`n[6/7] Verificando Open Interpreter 0.3.4..." -ForegroundColor Yellow
 
 & $venvActivate
 $oiVersion = python -c "import importlib.metadata; print(importlib.metadata.version('open-interpreter'))" 2>&1
 
 if ($oiVersion -ne "0.3.4") {
-    Write-Host "    Instalando open-interpreter==0.3.4 (versión fija)..." -ForegroundColor Gray
+    Write-Host "    Instalando open-interpreter==0.3.4 (version fija)..." -ForegroundColor Gray
     python -m pip install --upgrade pip --quiet
     pip install open-interpreter==0.3.4 --quiet
-    Write-Host "    ADVERTENCIA: ignorar cualquier aviso de versión más nueva." -ForegroundColor DarkYellow
+    Write-Host "    ADVERTENCIA: ignorar cualquier aviso de version mas nueva." -ForegroundColor DarkYellow
 }
-Write-Host "    OK — Open Interpreter 0.3.4" -ForegroundColor Green
+Write-Host "    OK â€” Open Interpreter 0.3.4" -ForegroundColor Green
 
-# ——————————————————————————
+# â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”
 # 7. CONFIG.YAML
-# ——————————————————————————
+# â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”
 Write-Host "`n[7/7] Verificando config.yaml..." -ForegroundColor Yellow
 
 $configPath = Join-Path $root "config.yaml"
@@ -159,26 +244,27 @@ memory_path: memoria/
 "@ | Set-Content -Path $configPath -Encoding UTF8
     Write-Host "    Creado config.yaml con valores por defecto." -ForegroundColor Gray
 } else {
-    Write-Host "    OK — config.yaml existente, no modificado" -ForegroundColor Green
+    Write-Host "    OK â€” config.yaml existente, no modificado" -ForegroundColor Green
 }
 
-# ——————————————————————————
-# COMMIT AUTOMÁTICO
-# ——————————————————————————
+# â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”
+# COMMIT AUTOMATICO
+# â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”
 Write-Host "`n[Git] Registrando estado..." -ForegroundColor Yellow
 
 Set-Location $root
 $status = git status --porcelain
 if ($status) {
     git add -A
-    git commit -m "setup.ps1: estado post-instalación $(Get-Date -Format 'yyyy-MM-dd HH:mm')"
-    Write-Host "    OK — commit realizado" -ForegroundColor Green
+    git commit -m "setup.ps1: estado post-instalacion $(Get-Date -Format 'yyyy-MM-dd HH:mm')"
+    Write-Host "    OK â€” commit realizado" -ForegroundColor Green
 } else {
-    Write-Host "    OK — sin cambios que registrar" -ForegroundColor Green
+    Write-Host "    OK â€” sin cambios que registrar" -ForegroundColor Green
 }
 
-# ——————————————————————————
+# â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”
 # RESULTADO FINAL
-# ——————————————————————————
-Write-Host "`n=== SETUP COMPLETADO ===" -ForegroundColor Cyan
+# â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”
+Write-Host "`n==== SETUP COMPLETADO ====" -ForegroundColor Cyan
 Write-Host "Para arrancar JARVIS2: .\jarvis.ps1" -ForegroundColor White
+
