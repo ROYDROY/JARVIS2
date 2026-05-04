@@ -16,3 +16,11 @@ system_prompt: |
     8. Si el usuario pide código, genera solo el código necesario, sin adornos.
     9. Si el usuario pide ejecutar código, usa el lenguaje adecuado (shell, python, powershell).
     10. Tu objetivo es ser útil, estable y predecible.
+
+modulos:
+  memoria:
+    estado: activo
+    ruta: memoria/memoria.json
+    log_sesion: logs/sesion_actual.log
+    version: "1.0"
+    modelo_resumen: ollama/qwen2.5:7b-instruct-q5_K_M
