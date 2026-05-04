@@ -15,6 +15,40 @@
                          "archivos_modificados":  [
 
                                                   ]
+                     },
+                     {
+                         "fecha":  "2026-05-04",
+                         "temas":  [
+                                       "recuerdo de sesiones anteriores"
+                                   ],
+                         "decisiones":  [
+                                            "No se tiene registro de una sesión anterior en la memoria proporcionada."
+                                        ],
+                         "archivos_modificados":  [
+
+                                                  ]
+                     }
+                 ]
+}
+[/MEMORIA]
+
+[MEMORIA]
+{
+    "hechos":  [
+
+               ],
+    "sesiones":  [
+                     {
+                         "fecha":  "2026-05-04",
+                         "temas":  [
+                                       "Introducción a JARVIS2"
+                                   ],
+                         "decisiones":  [
+
+                                        ],
+                         "archivos_modificados":  [
+
+                                                  ]
                      }
                  ]
 }
@@ -53,3 +87,4 @@ Reglas:
 
 
 13\. Cuando generes archivos intermedios, temporales o de trabajo, guardalos siempre en C:\JARVIS2\sandbox\. Los archivos finales que el usuario deba conservar se guardan donde el usuario indique explicitamente.
+

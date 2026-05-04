@@ -251,13 +251,18 @@ memory_path: memoria/
 Write-Host "`n[Git] Registrando estado..." -ForegroundColor Yellow
 
 Set-Location $root
-$status = git status --porcelain
-if ($status) {
-    git add -A
-    git commit -m "setup.ps1: estado post-instalacion $(Get-Date -Format 'yyyy-MM-dd HH:mm')"
-    Write-Host "    OK -- commit realizado" -ForegroundColor Green
+$isRepo = git rev-parse --is-inside-work-tree 2>$null
+if (-not $isRepo) {
+    Write-Host "    AVISO -- no es un repositorio git. Omitiendo commit." -ForegroundColor Yellow
 } else {
-    Write-Host "    OK -- sin cambios que registrar" -ForegroundColor Green
+    $status = git status --porcelain
+    if ($status) {
+        git add -A
+        git commit -m "setup.ps1: estado post-instalacion $(Get-Date -Format 'yyyy-MM-dd HH:mm')"
+        Write-Host "    OK -- commit realizado" -ForegroundColor Green
+    } else {
+        Write-Host "    OK -- sin cambios que registrar" -ForegroundColor Green
+    }
 }
 
 # ------------------------------
@@ -265,4 +270,5 @@ if ($status) {
 # ------------------------------
 Write-Host "`n==== SETUP COMPLETADO ====" -ForegroundColor Cyan
 Write-Host "Para arrancar JARVIS2: .\jarvis.ps1" -ForegroundColor White
+
 
