@@ -24,13 +24,29 @@ def log(role, content):
         f.write(f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] {role.upper()}: {content}\n")
 
 print("JARVIS2 operativo. Escribe tu consulta.")
+print("Comandos: 'salir' para cerrar | 'modo auto' para auto-aprobar | 'modo manual' para aprobar manualmente")
+
 while True:
     try:
         user_input = input("> ")
     except (EOFError, KeyboardInterrupt):
         break
-    if user_input.strip().lower() in ("salir", "exit", "quit"):
+
+    cmd = user_input.strip().lower()
+
+    if cmd in ("salir", "exit", "quit"):
         break
+    elif cmd == "modo auto":
+        interpreter.auto_run = True
+        print("[MODO AUTO] Ejecucion automatica activada.")
+        log("sistema", "modo auto activado")
+        continue
+    elif cmd == "modo manual":
+        interpreter.auto_run = False
+        print("[MODO MANUAL] Aprobacion manual activada.")
+        log("sistema", "modo manual activado")
+        continue
+
     log("usuario", user_input)
     response_text = ""
     for chunk in interpreter.chat(user_input, stream=True, display=True):
