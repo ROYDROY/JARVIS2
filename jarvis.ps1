@@ -13,13 +13,13 @@ Start-Sleep -Seconds 3
 if (Test-Path $logPath) {
     Write-Host "[Memoria] Procesando sesion anterior..." -ForegroundColor Gray
     $logContent = Get-Content $logPath -Raw -Encoding UTF8
-    $prompt = "Eres un asistente que genera resumenes estructurados. Resume la siguiente sesion de trabajo en formato JSON con esta estructura exacta: {"fecha":"FECHA","temas":[],"decisiones":[],"archivos_modificados":[]}. Solo devuelve el JSON, sin explicaciones ni texto adicional. Sesion:
+    $prompt = "Resume esta sesion en JSON con exactamente estos campos: fecha (string con fecha actual), temas (array de strings), decisiones (array de strings), archivos_modificados (array de strings). Devuelve solo el JSON sin explicaciones ni marcas de codigo. Sesion:
 $logContent"
     $body = @{ model = "qwen2.5:7b-instruct-q5_K_M"; prompt = $prompt; stream = $false } | ConvertTo-Json -Depth 3
     try {
         $response = Invoke-RestMethod -Uri "http://localhost:11434/api/generate" -Method POST -Body $body -ContentType "application/json"
         $resumenRaw = $response.response.Trim()
-        $resumenRaw = $resumenRaw -replace '^`json','' -replace '^`','' -replace '`$',''
+        $resumenRaw = $resumenRaw -replace '(?s)^.*?({)','{' -replace '(?s)(})[^}]*$','}'
         $resumen = $resumenRaw | ConvertFrom-Json
         $memoria = Get-Content $memoriaPath -Raw -Encoding UTF8 | ConvertFrom-Json
         $memoria.sesiones += $resumen
