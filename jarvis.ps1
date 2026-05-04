@@ -59,3 +59,14 @@ Write-Host "`n[Limpieza] Eliminando temporales..." -ForegroundColor Gray
 Get-ChildItem $root -Recurse -Include "*.tmp","*.pyc" | Remove-Item -Force -ErrorAction SilentlyContinue
 Get-ChildItem $root -Recurse -Directory -Filter "__pycache__" | Remove-Item -Recurse -Force -ErrorAction SilentlyContinue
 Write-Host "    OK" -ForegroundColor Gray
+
+# --- LIMPIEZA CATEGORIA B (sandbox) ---
+$sandboxPath = "$root\sandbox"
+if (Test-Path $sandboxPath) {
+    $items = Get-ChildItem $sandboxPath -Recurse -File
+    if ($items) {
+        Write-Host "[Limpieza] Vaciando sandbox ($($items.Count) archivos)..." -ForegroundColor Gray
+        $items | Remove-Item -Force -ErrorAction SilentlyContinue
+        Write-Host "    OK" -ForegroundColor Gray
+    }
+}
