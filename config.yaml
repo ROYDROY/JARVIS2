@@ -24,3 +24,11 @@ modulos:
     log_sesion: logs/sesion_actual.log
     version: "1.0"
     modelo_resumen: ollama/qwen2.5:7b-instruct-q5_K_M
+
+modulos:
+  memoria:
+    estado: activo
+    ruta: memoria/memoria.json
+    log_sesion: logs/sesion_actual.log
+    version: "1.0"
+    modelo_resumen: ollama/qwen2.5:7b-instruct-q5_K_M
