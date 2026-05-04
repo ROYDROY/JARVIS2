@@ -5,6 +5,10 @@ $logPath     = "$root\logs\sesion_actual.log"
 $memoriaPath = "$root\memoria\memoria.json"
 $systemPath  = "$root\system.md"
 
+# --- ARRANQUE OLLAMA PRIMERO ---
+Start-Process "ollama" -ArgumentList "serve" -WindowStyle Hidden
+Start-Sleep -Seconds 3
+
 # --- PROCESAR SESION ANTERIOR ---
 if (Test-Path $logPath) {
     Write-Host "[Memoria] Procesando sesion anterior..." -ForegroundColor Gray
@@ -15,7 +19,7 @@ $logContent"
     try {
         $response = Invoke-RestMethod -Uri "http://localhost:11434/api/generate" -Method POST -Body $body -ContentType "application/json"
         $resumenRaw = $response.response.Trim()
-        $resumenRaw = $resumenRaw -replace '^`json','' -replace '^`','' -replace '`$','' 
+        $resumenRaw = $resumenRaw -replace '^`json','' -replace '^`','' -replace '`$',''
         $resumen = $resumenRaw | ConvertFrom-Json
         $memoria = Get-Content $memoriaPath -Raw -Encoding UTF8 | ConvertFrom-Json
         $memoria.sesiones += $resumen
@@ -43,9 +47,7 @@ $memoriaTexto
     }
 }
 
-# --- ARRANQUE NORMAL ---
-Start-Process "ollama" -ArgumentList "serve" -WindowStyle Hidden
-Start-Sleep -Seconds 3
+# --- JARVIS ---
 & "$root\venv\Scripts\Activate.ps1"
 python "$root\launcher.py"
 
