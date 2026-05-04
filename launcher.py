@@ -1,4 +1,8 @@
-﻿from interpreter import interpreter
+﻿import sys
+import io
+sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8')
+sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding='utf-8')
+from interpreter import interpreter
 system_msg = open("C:\\JARVIS2\\system.md", "r", encoding="utf-8").read()
 interpreter.system_message = system_msg
 interpreter.llm.model = "ollama/qwen2.5:7b-instruct-q5_K_M"
