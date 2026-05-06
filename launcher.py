@@ -38,8 +38,8 @@ if os.path.exists(MEMORIA_PATH):
             if s.get("archivos_modificados"):
                 texto += f"  Archivos modificados: {', '.join(s['archivos_modificados'])}\n"
         interpreter.messages = [
-            {"role": "user", "content": texto},
-            {"role": "assistant", "content": "Memoria cargada. Tengo registro de esas sesiones y las usare como contexto durante esta sesion."}
+            {"role": "user", "type": "message", "content": texto},
+            {"role": "assistant", "type": "message", "content": "Memoria cargada. Tengo registro de esas sesiones y las usare como contexto durante esta sesion."}
         ]
 
 def log(role, content):
