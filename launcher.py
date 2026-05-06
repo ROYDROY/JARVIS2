@@ -13,7 +13,7 @@ LOG_PATH = r"C:\JARVIS2\logs\sesion_actual.log"
 MEMORIA_PATH = r"C:\JARVIS2\memoria\memoria.json"
 os.makedirs(r"C:\JARVIS2\logs", exist_ok=True)
 
-system_msg = open(r"C:\JARVIS2\system.md", "r", encoding="utf-8").read()
+system_msg = open(r"C:\JARVIS2\system.md", "r", encoding="utf-8-sig").read()
 interpreter.system_message = system_msg
 interpreter.llm.model = "ollama/qwen2.5:7b-instruct-q5_K_M"
 interpreter.llm.context_window = 8192
@@ -22,7 +22,7 @@ interpreter.auto_run = False
 
 # ---- INYECTAR MEMORIA COMO HISTORIAL DE CONVERSACION ----
 if os.path.exists(MEMORIA_PATH):
-    with open(MEMORIA_PATH, "r", encoding="utf-8") as f:
+    with open(MEMORIA_PATH, "r", encoding="utf-8-sig") as f:
         memoria = json.load(f)
     sesiones_utiles = [s for s in memoria.get("sesiones", [])
                        if s.get("temas") or s.get("decisiones") or s.get("archivos_modificados")]
