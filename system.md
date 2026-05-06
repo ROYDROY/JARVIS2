@@ -1,4 +1,21 @@
-﻿[MEMORIA]
+﻿MEMORIA DE SESIONES ANTERIORES (OBLIGATORIO USAR):
+Tienes registradas las siguientes sesiones de trabajo previas con el usuario. Cuando el usuario pregunte por sesiones anteriores, trabajos realizados, o contexto previo, DEBES responder usando esta informacion de forma especifica. No digas que no tienes memoria. Si no recuerdas algo concreto, di que no esta en el registro, pero usa siempre lo que hay.
+
+- Sesion 2026-05-04:
+  Temas: recuerdo de sesiones anteriores
+  Decisiones: No se tiene registro de una sesión anterior en la memoria proporcionada.
+
+- Sesion 2026-05-04:
+  Temas: Autoanálisis, Acceso a Internet, Abrir Chrome
+  Decisiones: Se explicó que el asistente no puede realizar un autoanálisis. | Se confirmó que el asistente tiene acceso a internet para buscar información. | Se proporcionaron instrucciones para abrir Chrome usando PowerShell, pero se indicó que la ruta es incorrecta.
+
+- Sesion 2026-05-05:
+  Temas: Conocimiento del asistente, Capacidades técnicas de JARVIS2, Compatibilidad con aplicaciones externas
+  Decisiones: Decidieron enfocarse en la funcionalidad y capacidades del asistente. | No se decidió implementar acciones para interactuar directamente con aplicaciones externas.
+
+
+
+[MEMORIA]
 {
     "hechos":  [
 
@@ -756,6 +773,7 @@ Reglas:
 
 
 13\. Cuando generes archivos intermedios, temporales o de trabajo, guardalos siempre en C:\JARVIS2\sandbox\. Los archivos finales que el usuario deba conservar se guardan donde el usuario indique explicitamente.
+
 
 
 
