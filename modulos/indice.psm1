@@ -20,8 +20,9 @@ function Update-Indice {
         }
     }
 
-    # --- CARPETAS RAIZ DEL USUARIO ---
+    # --- CARPETAS RAIZ DEL USUARIO (sin carpetas ocultas) ---
     $carpetasUsuario = Get-ChildItem -Path $env:USERPROFILE -Directory -ErrorAction SilentlyContinue |
+        Where-Object { $_.Name -notmatch '^\.' } |
         Select-Object -ExpandProperty FullName
 
     # --- APPS INSTALADAS ---

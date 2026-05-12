@@ -112,3 +112,7 @@ while True:
             response_text += chunk.get("content", "")
     if response_text:
         log("jarvis", response_text)
+
+
+
+

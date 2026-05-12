@@ -70,6 +70,25 @@ if (Test-Path $memoriaPath) {
 # ----- INDICE -----
 Update-Indice -RutaBase $root
 
+$indicePath = "$root\memoria\indice.json"
+if (Test-Path $indicePath) {
+    $indice = Get-Content $indicePath -Raw -Encoding UTF8 | ConvertFrom-Json
+    if ($indice.discos) {
+        $indiceTexto = "INDICE DEL SISTEMA (generado: $($indice.generado)):`n"
+        foreach ($d in $indice.discos) {
+            $indiceTexto += "- Disco $($d.letra) $($d.etiqueta): $($d.libre_gb) GB libres / $($d.total_gb) GB total`n"
+        }
+        $indiceTexto += "Carpetas de usuario:`n"
+        foreach ($c in $indice.carpetas_usuario) {
+            $indiceTexto += "- $c`n"
+        }
+        $indiceTexto += "`n"
+        $currentSystem = Get-Content $systemPath -Raw -Encoding UTF8
+        Set-Content $systemPath -Value ($indiceTexto + $currentSystem) -Encoding UTF8
+        Write-Host "[Indice] Resumen inyectado en system prompt." -ForegroundColor Cyan
+    }
+}
+
 # ----- JARVIS -----
 & $root\venv\Scripts\Activate.ps1
 python "$root\launcher.py"
@@ -93,3 +112,5 @@ if (Test-Path $sandboxPath) {
         Write-Host "  OK" -ForegroundColor Gray
     }
 }
+
+
