@@ -28,7 +28,3 @@ modulos:
     estado: activo
     ruta: modulos/indice.psm1
     version: "1.0"
-  prueba_fallo:
-    estado: activo
-    ruta: modulos/prueba_fallo.psm1
-    version: "1.0"

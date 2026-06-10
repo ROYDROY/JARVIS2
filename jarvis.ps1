@@ -4,7 +4,7 @@ $memoriaPath = "$root\memoria\memoria.json"
 $systemPath  = "$root\system.md"
 
 # ----- CARGADOR DE MODULOS (DIAGNOSTICO) -----
-Write-Host "\n[Diagnostico de Arranque] Iniciando modulos..." -ForegroundColor Cyan
+Write-Host "`n[Diagnostico de Arranque] Iniciando modulos..." -ForegroundColor Cyan
 & $root\venv\Scripts\Activate.ps1
 $activeModulesJson = python -c "import json, yaml; config=yaml.safe_load(open(r'$root\config.yaml', encoding='utf-8')); active=[m['ruta'] for k,m in config.get('modulos',{}).items() if m.get('estado')=='activo' and m.get('ruta','').endswith('.psm1')]; print(json.dumps(active))"
 $activeModules = $activeModulesJson | ConvertFrom-Json
@@ -27,7 +27,7 @@ foreach ($mod in $activeModules) {
         Write-Host "  [-] Modulo no encontrado: $modPath" -ForegroundColor Red
     }
 }
-Write-Host "----------------------------------------\n" -ForegroundColor Cyan
+Write-Host "----------------------------------------`n" -ForegroundColor Cyan
 
 
 # ----- ARRANQUE OLLAMA PRIMERO -----
