@@ -24,3 +24,11 @@ modulos:
     log_sesion: logs/sesion_actual.log
     version: "1.0"
     modelo_resumen: ollama/qwen2.5:7b-instruct-q5_K_M
+  indice:
+    estado: activo
+    ruta: modulos/indice.psm1
+    version: "1.0"
+  prueba_fallo:
+    estado: activo
+    ruta: modulos/prueba_fallo.psm1
+    version: "1.0"
