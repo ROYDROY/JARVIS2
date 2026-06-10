@@ -1,4 +1,4 @@
-﻿import sys
+import sys
 import io
 import os
 import json
@@ -6,6 +6,17 @@ from datetime import datetime
 
 sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8')
 sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding='utf-8')
+
+import builtins
+_original_input = builtins.input
+
+def custom_input(prompt=""):
+    val = _original_input(prompt)
+    if val.strip().lower() in ("salir", "exit", "quit"):
+        sys.exit(0)
+    return val
+
+builtins.input = custom_input
 
 from interpreter import interpreter
 
