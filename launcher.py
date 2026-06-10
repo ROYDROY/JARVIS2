@@ -59,7 +59,8 @@ if os.path.exists(INDICE_PATH):
     with open(INDICE_PATH, "r", encoding="utf-8-sig") as f:
         indice = json.load(f)
     if indice and indice != {}:
-        texto_indice = f"Estado actual del sistema (generado: {indice.get('generado', '?')}):\n"
+        tipo = indice.get("tipo_actualizacion", "Completa")
+        texto_indice = f"Estado actual del sistema (generado: {indice.get('generado', '?')} - Actualizacion: {tipo}):\n"
 
         discos = indice.get("discos", [])
         if discos:
