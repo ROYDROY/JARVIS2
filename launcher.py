@@ -30,7 +30,7 @@ interpreter.system_message = system_msg
 interpreter.llm.model = "ollama/qwen2.5:7b-instruct-q5_K_M"
 interpreter.llm.context_window = 8192
 interpreter.llm.max_tokens = 2048
-interpreter.auto_run = False
+interpreter.auto_run = True
 
 # ----- INYECTAR MEMORIA COMO HISTORIAL DE CONVERSACION -----
 if os.path.exists(MEMORIA_PATH):
