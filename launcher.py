@@ -47,6 +47,8 @@ if os.path.exists(MEMORIA_PATH):
                 texto += f"  Temas: {', '.join(s['temas'])}\n"
             if s.get("decisiones"):
                 texto += f"  Decisiones: {' | '.join(s['decisiones'])}\n"
+            if s.get("hechos"):
+                texto += f"  Hechos: {' | '.join(s['hechos'])}\n"
             if s.get("archivos_modificados"):
                 texto += f"  Archivos modificados: {', '.join(s['archivos_modificados'])}\n"
         interpreter.messages = [
