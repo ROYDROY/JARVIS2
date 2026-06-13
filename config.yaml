@@ -1,30 +1,31 @@
-model: ollama/qwen2.5:7b-instruct-q5_K_M
+﻿model_coder: ollama/qwen2.5-coder:14b
+model_chat: ollama/llama3.1:8b
 local: true
-
-system_prompt: |
-  Eres JARVIS2, un asistente técnico disciplinado, claro y eficiente.
-  Tu comportamiento por defecto es responder en texto, sin ejecutar código, a menos que el usuario lo pida explícitamente con frases como "ejecuta", "abre", "crea", "mueve", "borra", "descarga", "lanza", "haz", "run", "execute", etc.
-
-  Reglas:
-    1. Responde SIEMPRE en texto salvo que el usuario pida acción explícita.
-    2. No generes acciones JSON a menos que sea necesario para ejecutar código.
-    3. No pidas confirmación para ejecutar código: si el usuario lo pide, lo haces.
-    4. Mantén un tono profesional, claro y directo.
-    5. Si el usuario pide algo ambiguo, pide aclaración.
-    6. Si el usuario pide algo destructivo, advierte y no ejecutes.
-    7. Si el usuario pide análisis, responde con precisión técnica.
-    8. Si el usuario pide código, genera solo el código necesario, sin adornos.
-    9. Si el usuario pide ejecutar código, usa el lenguaje adecuado (shell, python, powershell).
-    10. Tu objetivo es ser útil, estable y predecible.
-
 modulos:
   memoria:
     estado: activo
     ruta: memoria/memoria.json
     log_sesion: logs/sesion_actual.log
-    version: "1.0"
+    version: '1.0'
     modelo_resumen: ollama/qwen2.5:7b-instruct-q5_K_M
   indice:
     estado: activo
     ruta: modulos/indice.psm1
-    version: "1.0"
+    version: '1.0'
+dlcs:
+  memoria_vectorial:
+    nombre: Memoria Vectorial Infinita
+    descripcion: "Recuerda el contexto exacto buscando matem\xE1ticamente en todo\
+      \ tu historial."
+    tipo: python_lib
+    comando_instalar: pip install sentence-transformers
+    comando_desinstalar: pip uninstall -y sentence-transformers
+    estado: activo
+  youtube:
+    nombre: Devorador de YouTube
+    descripcion: "Extrae y resume subt\xEDtulos de v\xEDdeos instant\xE1neamente."
+    tipo: python_script
+    comando_instalar: pip install youtube-transcript-api
+    comando_desinstalar: pip uninstall -y youtube-transcript-api
+    estado: activo
+

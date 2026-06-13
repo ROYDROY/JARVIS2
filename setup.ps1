@@ -1,4 +1,4 @@
-﻿# setup.ps1 -- JARVIS2
+# setup.ps1 -- JARVIS2
 # Uso: git clone <repo> && cd <repo> && .\setup.ps1
 # Levanta el sistema completo en maquina limpia sin pasos manuales.
 
@@ -149,47 +149,41 @@ if (-not (Check-Command ollama)) {
 Write-Host "    OK -- $(ollama --version)" -ForegroundColor Green
 
 # ------------------------------
-# 4. MODELO
 # ------------------------------
-Write-Host "`n[4/7] Verificando modelo..." -ForegroundColor Yellow
+# 4. MODELOS (MoE DINÁMICO)
+# ------------------------------
+Write-Host "`n[4/7] Evaluando Hardware para Modelos MoE..." -ForegroundColor Yellow
 
-$modelList = ollama list 2>&1
+$ramGB = [math]::Round((Get-CimInstance Win32_ComputerSystem).TotalPhysicalMemory / 1GB, 0)
+Write-Host "    Memoria RAM detectada: $ramGB GB" -ForegroundColor Gray
 
-$modelos = @(
-    [PSCustomObject]@{ Nombre = "qwen2.5:7b-instruct-q5_K_M"; Tamano = "5.4GB"; Descripcion = "Recomendado - equilibrado" },
-    [PSCustomObject]@{ Nombre = "qwen2.5:3b-instruct";        Tamano = "2.1GB"; Descripcion = "Ligero, menos capaz" },
-    [PSCustomObject]@{ Nombre = "llama3.2:3b";                Tamano = "2.0GB"; Descripcion = "Alternativa ligera" },
-    [PSCustomObject]@{ Nombre = "MANUAL";                     Tamano = "-";     Descripcion = "Introducir nombre manualmente" }
-)
-
-$modeloInstalado = $null
-foreach ($m in $modelos | Where-Object { $_.Nombre -ne "MANUAL" }) {
-    if ($modelList -match $m.Nombre) {
-        $modeloInstalado = $m.Nombre
-        break
-    }
+if ($ramGB -ge 32) {
+    Write-Host "    Tier 1 (Ferrari): Asignando qwen2.5-coder:14b (Codigo) y llama3.1:8b (Chat)." -ForegroundColor Green
+    $modelCoder = "qwen2.5-coder:14b"
+    $modelChat = "llama3.1:8b"
+} elseif ($ramGB -ge 16) {
+    Write-Host "    Tier 2 (Berlina): Asignando qwen2.5:7b (Universal)." -ForegroundColor Yellow
+    $modelCoder = "qwen2.5:7b"
+    $modelChat = "qwen2.5:7b"
+} else {
+    Write-Host "    Tier 3 (Patinete): Asignando qwen2.5:3b (Ultra ligero)." -ForegroundColor DarkYellow
+    $modelCoder = "qwen2.5:3b"
+    $modelChat = "qwen2.5:3b"
 }
 
-if ($modeloInstalado) {
-    Write-Host "    OK -- modelo presente: $modeloInstalado" -ForegroundColor Green
-    $modeloSeleccionado = $modeloInstalado
-} else {
-    Write-Host "    No se detecto ningun modelo instalado. Selecciona uno:`n" -ForegroundColor Yellow
-    for ($i = 0; $i -lt $modelos.Count; $i++) {
-        Write-Host "    $($i+1). $($modelos[$i].Nombre)  [$($modelos[$i].Tamano)] -- $($modelos[$i].Descripcion)" -ForegroundColor White
+$modelEmbed = "nomic-embed-text"
+
+$modelosRequeridos = @($modelCoder, $modelChat, $modelEmbed) | Select-Object -Unique
+$modelList = ollama list 2>&1
+
+foreach ($m in $modelosRequeridos) {
+    if ($modelList -match $m) {
+        Write-Host "    OK -- modelo presente: $m" -ForegroundColor Green
+    } else {
+        Write-Host "    Descargando $m (puede tardar varios minutos)..." -ForegroundColor Gray
+        ollama pull $m
+        Write-Host "    OK -- modelo instalado: $m" -ForegroundColor Green
     }
-    Write-Host ""
-    $seleccion = Read-Host "    Opcion (1-4)"
-    switch ($seleccion) {
-        "1" { $modeloSeleccionado = $modelos[0].Nombre }
-        "2" { $modeloSeleccionado = $modelos[1].Nombre }
-        "3" { $modeloSeleccionado = $modelos[2].Nombre }
-        "4" { $modeloSeleccionado = Read-Host "    Nombre del modelo (ej: mistral:7b)" }
-        default { Write-Error "Opcion no valida." }
-    }
-    Write-Host "    Descargando $modeloSeleccionado..." -ForegroundColor Gray
-    ollama pull $modeloSeleccionado
-    Write-Host "    OK -- modelo instalado: $modeloSeleccionado" -ForegroundColor Green
 }
 
 # ------------------------------
@@ -217,9 +211,9 @@ Write-Host "`n[6/7] Verificando Open Interpreter 0.3.4..." -ForegroundColor Yell
 $oiVersion = python -c "import importlib.metadata; print(importlib.metadata.version('open-interpreter'))" 2>&1
 
 if ($oiVersion -ne "0.3.4") {
-    Write-Host "    Instalando open-interpreter==0.3.4 (version fija)..." -ForegroundColor Gray
+    Write-Host "    Instalando dependencias (Open Interpreter, ChromaDB)..." -ForegroundColor Gray
     python -m pip install --upgrade pip --quiet
-    pip install open-interpreter==0.3.4 --quiet
+    pip install open-interpreter==0.3.4 chromadb --quiet
     Write-Host "    ADVERTENCIA: ignorar cualquier aviso de version mas nueva." -ForegroundColor DarkYellow
 }
 Write-Host "    OK -- Open Interpreter 0.3.4" -ForegroundColor Green
@@ -233,16 +227,25 @@ $configPath = Join-Path $root "config.yaml"
 if (-not (Test-Path $configPath)) {
     Write-Host "    config.yaml no encontrado. Generando valores por defecto..." -ForegroundColor Gray
     @"
-model: ollama/$modeloSeleccionado
+model_coder: ollama/$modelCoder
+model_chat: ollama/$modelChat
 auto_run: false
 system_message_path: system.md
 sandbox: true
 logs_path: logs/
 memory_path: memoria/
 "@ | Set-Content -Path $configPath -Encoding UTF8
-    Write-Host "    Creado config.yaml con valores por defecto." -ForegroundColor Gray
+    Write-Host "    Creado config.yaml con valores por defecto adaptados a tu hardware." -ForegroundColor Gray
 } else {
-    Write-Host "    OK -- config.yaml existente, no modificado" -ForegroundColor Green
+    Write-Host "    config.yaml existente detectado. Actualizando modelos..." -ForegroundColor Gray
+    $configContent = Get-Content $configPath -Raw
+    $configContent = $configContent -replace "(?m)^model:.*`r?`n", ""
+    $configContent = $configContent -replace "(?m)^model_coder:.*`r?`n", ""
+    $configContent = $configContent -replace "(?m)^model_chat:.*`r?`n", ""
+    
+    $newModels = "model_coder: ollama/$modelCoder`nmodel_chat: ollama/$modelChat`n"
+    $newModels + $configContent | Set-Content -Path $configPath -Encoding UTF8
+    Write-Host "    OK -- config.yaml actualizado con los modelos MoE." -ForegroundColor Green
 }
 
 # ------------------------------

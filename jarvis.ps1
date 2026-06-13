@@ -32,7 +32,20 @@ Write-Host "----------------------------------------`n" -ForegroundColor Cyan
 
 # ----- ARRANQUE OLLAMA PRIMERO -----
 Start-Process "ollama" -ArgumentList "serve" -WindowStyle Hidden
-Start-Sleep -Seconds 3
+Write-Host "[Motor] Esperando a que Ollama despierte..." -ForegroundColor Gray
+$timeout = 15
+$stopwatch = [System.Diagnostics.Stopwatch]::StartNew()
+while ($stopwatch.Elapsed.TotalSeconds -lt $timeout) {
+    try {
+        $tcpConnection = New-Object System.Net.Sockets.TcpClient("127.0.0.1", 11434)
+        $tcpConnection.Close()
+        Write-Host "  OK - Cerebro activo" -ForegroundColor Green
+        break
+    } catch {
+        Start-Sleep -Milliseconds 500
+    }
+}
+$stopwatch.Stop()
 
 # ----- FORZAR CONSOLA UTF-8 -----
 chcp 65001 | Out-Null
