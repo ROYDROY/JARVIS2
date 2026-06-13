@@ -20,6 +20,12 @@ except Exception as e:
     def hablar(txt): pass
     def escuchar(): return ""
     def escuchar_pasivo(): return False
+    
+try:
+    from NervioOptico import extraer_ruta_imagen, analizar_imagen_con_llava
+except Exception as e:
+    def extraer_ruta_imagen(txt): return None
+    def analizar_imagen_con_llava(ruta): return None
 
 # ==============================================================================
 # ==============================================================================
@@ -226,9 +232,20 @@ while True:
         continue
 
     log("usuario", user_input)
-    log("usuario", user_input)
     response_text = ""
     try:
+        # --- NERVIO ÓPTICO: DETECCIÓN DE IMÁGENES ---
+        ruta_img = extraer_ruta_imagen(user_input)
+        if ruta_img:
+            desc_visual = analizar_imagen_con_llava(ruta_img)
+            if desc_visual:
+                # Limpiamos la ruta del input original para que no ensucie
+                user_input_limpio = user_input.replace(ruta_img, "").replace('""', '').strip()
+                if not user_input_limpio:
+                    user_input_limpio = "Por favor, analiza la imagen que te he pasado y dime qué ves o ayúdame con lo que aparece en ella."
+                    
+                user_input = f"[SISTEMA VISUAL: El usuario ha proporcionado una imagen. Tu nervio óptico (Llava) la ha analizado y reporta lo siguiente:\n{desc_visual}]\n\nConsulta del usuario: {user_input_limpio}"
+                
         # --- RAG: HIPOCAMPO / MEMORIA VECTORIAL ---
         prompt_final = user_input
         try:
