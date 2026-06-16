@@ -86,7 +86,7 @@ def seleccionar_cerebro(prompt, modo="Automático"):
         keywords_autonomo = ["audita", "analiza el pc", "analiza el ordenador", "analiza mi pc", "analiza mi ordenador",
                              "genera un informe", "crea un informe", "escribe un informe",
                              "investiga el", "diagnóstico", "diagnostico", "examina el sistema",
-                             "revisa el sistema", "escanea"]
+                             "revisa el sistema", "escanea", "escan", "escán", "scann", "scaner"]
         if any(k in prompt_lower for k in keywords_autonomo):
             es_autonomo = True
         else:
@@ -1023,6 +1023,7 @@ class JarvisApp(ctk.CTk):
                     "Si un código falla repetidas veces y no logras solucionarlo, DEBES explicarle al usuario cuál es el error exacto y por qué falló ANTES de darte por vencido y escribir [TAREA_COMPLETADA]. "
                     "HERRAMIENTAS LOCALES (SKILLS): Para buscar archivos o carpetas, NUNCA uses Get-ChildItem -Recurse desde la raíz. Ejecuta SIEMPRE el script: C:\\JARVIS2\\herramientas\\Buscar-Archivo.ps1 -PatronBusqueda 'Nombre'. Es ultra-rápido porque usa Everything. "
                     "Para buscar noticias o actualidad, ejecuta: python C:\\JARVIS2\\herramientas\\Buscador.py 'búsqueda'. "
+                    "Para escanear documentos, ejecuta: C:\\JARVIS2\\herramientas\\Escanear-Documento.ps1. Este script escaneará la primera página, preguntará interactiva y visualmente si se desea añadir más páginas, compilará todo en un único PDF y lo abrirá en Acrobat Pro. "
                     "Si el usuario te da una ruta, ÚSALA estrictamente. "
                     "REGLA ANTI-ALUCINACIÓN: NUNCA escribas ni imites las etiquetas internas del sistema (como [RESULTADO ACTUALIZADO DE INTERNET...], [SISTEMA], [OK], etc). TÚ eres el asistente, no el motor que inyecta herramientas. No simules salidas de comandos ni búsquedas. "
                     "PERMISOS: Si necesitas permisos elevados, NUNCA te inventes comandos como 'RunAsAdmin', 'sudo' o intentes forzar la elevación por código. Escribe PowerShell puro estándar. "
