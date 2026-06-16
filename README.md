@@ -76,6 +76,7 @@ Las herramientas principales son:
 1. `Buscador.py`: Agente de búsqueda autónomo basado en DuckDuckGo. Implementa un filtro estricto anti-Wikipedia. Si la IA requiere información de actualidad o exterior, DEBE ejecutar este script.
 2. `Buscar-Archivo.ps1`: Capa de búsqueda de archivos locales. Nunca uses `Get-ChildItem -Recurse` desde la raíz.
 3. `MotorVoz.py` / `NervioOptico.py`: Módulos periféricos de escucha pasiva, síntesis de voz y procesamiento de visión artificial.
+4. `Escanear-Documento.ps1`: Capa de escaneo de documentos multipágina interactivo. Digitaliza la primera página, gestiona cuadros de diálogo popups de Windows para añadir más páginas, compila el archivo PDF resultante y lo abre automáticamente en Acrobat Pro.
 
 **Para añadir una nueva Skill:**
 1. Escribe un script (Python o PowerShell) y guárdalo en `\herramientas\`.
