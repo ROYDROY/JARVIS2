@@ -12,3 +12,4 @@ ram_history.json
 error.log
 herramientas/*.mp3
 *.mp3
+installer/
