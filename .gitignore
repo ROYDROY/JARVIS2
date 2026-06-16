@@ -1,1 +1,14 @@
 venv/
+venv_browser/
+logs/
+sandbox/
+scratch/
+__pycache__/
+*.pyc
+memoria/
+.env
+vector_db/
+ram_history.json
+error.log
+herramientas/*.mp3
+*.mp3

@@ -1,0 +1,27 @@
+[
+    {
+        "role": "user",
+        "type": "message",
+        "content": "hola"
+    },
+    {
+        "role": "user",
+        "type": "message",
+        "content": "me oyes"
+    },
+    {
+        "role": "assistant",
+        "type": "message",
+        "content": "¡Eh! Sí, sí que me oyes. ¿Qué quieres?"
+    },
+    {
+        "role": "user",
+        "type": "message",
+        "content": "sí Rubén"
+    },
+    {
+        "role": "assistant",
+        "type": "message",
+        "content": "Hola Rubén. ¿En qué puedo ayudarte hoy?"
+    }
+]

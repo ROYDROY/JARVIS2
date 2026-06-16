@@ -268,6 +268,13 @@ while True:
 
         modelo_elegido = seleccionar_cerebro(user_input)
         interpreter.llm.model = modelo_elegido
+        
+        # Llama 3.1 a veces falla si se le fuerza a usar funciones (devuelve {}). Se lo desactivamos.
+        if "llama" in modelo_elegido.lower():
+            interpreter.llm.supports_functions = False
+        else:
+            interpreter.llm.supports_functions = True
+            
         print(f"\n[ROUTER MoE] Enrutando al cerebro especializado: {modelo_elegido}")
 
         for chunk in interpreter.chat(prompt_final, stream=True, display=True):

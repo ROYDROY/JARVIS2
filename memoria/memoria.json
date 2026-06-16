@@ -1,1 +1,289 @@
-﻿{"hechos":[],"sesiones":[]}
+{
+    "hechos": [],
+    "sesiones": [
+        {
+            "fecha": "2026-06-10",
+            "temas": [
+                "revisión del proyecto JARVIS2",
+                "archivo config.yaml"
+            ],
+            "decisiones": [],
+            "archivos_modificados": [
+                "config.yaml"
+            ],
+            "hechos": [
+                "USUARIO",
+                "Hola jarvis",
+                "JARVIS",
+                "¡Hola! ¿Cómo estás?",
+                "sesiones previas en las que hemos revisado el proyecto JARVIS2 y hemos trabajado en el archivoconfig.yaml`",
+                "registraste tu nombre (Rubén)",
+                "la fecha de cumpleaños de tu hijo (02-10-2009)"
+            ]
+        },
+        {
+            "fecha": "2026-06-10",
+            "temas": [
+                "Revisión de nombre y cumpleaños"
+            ],
+            "decisiones": [],
+            "archivos_modificados": [],
+            "hechos": [
+                "USUARIO se llama Rubén",
+                "El cumpleaños del hijo del USUARIO es 02-10-2009"
+            ]
+        },
+        {
+            "fecha": "2026-06-10",
+            "temas": [
+                "Recuerdos anteriores",
+                "Proyecto JARVIS2",
+                "Archivo config.yaml"
+            ],
+            "decisiones": [],
+            "archivos_modificados": [
+                "config.yaml"
+            ],
+            "hechos": [
+                "USUARIO se llama Rubén",
+                "Se revisó el proyecto JARVIS2 y trabajaron en el archivo config.yaml"
+            ]
+        },
+        {
+            "fecha": "2026-06-10",
+            "temas": [
+                "Recuerdo personal",
+                "Proyecto JARVIS2",
+                "Archivo config.yaml",
+                "Fecha de cumpleaños del hijo",
+                "Estado de la GPU",
+                "Resumen del PDF"
+            ],
+            "decisiones": [
+                "Activar modo auto",
+                "Ejecutar script para revisar estado de la GPU y generar resumen del PDF",
+                "Entregar resumen del PDF finalizado"
+            ],
+            "archivos_modificados": [
+                "config.yaml",
+                "C:\\JARVIS2\\sandbox\\prueba.pdf"
+            ],
+            "hechos": [
+                "USUARIO se llama Rubén",
+                "JARVIS ha trabajado en el archivo config.yaml del proyecto JARVIS2",
+                "La fecha de cumpleaños del hijo de USUARIO es 02-10-2009",
+                "SISTEMA activó modo auto",
+                "JARVIS revisó el estado de la GPU y generó un resumen del PDF ubicado en C:\\JARVIS2\\sandbox\\prueba.pdf",
+                "El resumen muestra las últimas líneas del documento, indicando el potencial de crecimiento hacia JARVIS, condiciones para considerarlo un sistema funcional y créditos a diferentes IA utilizadas"
+            ]
+        },
+        {
+            "fecha": "2026-06-10",
+            "temas": [
+                "Revisión de nombre y cumpleaños",
+                "Trabajo en el proyecto JARVIS2",
+                "Activación del modo auto",
+                "Revisión del estado de la GPU",
+                "Generación de resumen de un PDF",
+                "Actualización del estado del sistema"
+            ],
+            "decisiones": [
+                "Confirmar nombre y cumpleaños",
+                "Trabajar en archivoconfig.yaml del proyecto JARVIS2",
+                "Activar modo auto",
+                "Verificar estado de la GPU",
+                "Generar resumen parcial del PDF usando Leer-PDF.py"
+            ],
+            "archivos_modificados": [
+                "config.yaml",
+                "Monitor-GPU.ps1",
+                "Leer-PDF.py"
+            ],
+            "hechos": [
+                "2026-06-10 11:55:52",
+                "USUARIO",
+                "Hola Jarvis",
+                "2026-06-10 11:55:56",
+                "JARVIS",
+                "¡Hola Rubén! ¿En qué puedo ayudarte hoy?",
+                "2026-06-10 11:56:05",
+                "USUARIO",
+                "Recuerdas todo lo que acabas de hacer?",
+                "2026-06-10 11:56:08",
+                "JARVIS",
+                "Sí, recuerdo las sesiones y el estado actual del sistema. He revisado los discos, carpetas del usuario y aplicaciones instaladas. ¿Hay algo específico en lo que te pueda ayudar hoy?",
+                "2026-06-10 11:56:21",
+                "USUARIO",
+                "que más hiciste?",
+                "2026-06-10 11:56:27",
+                "JARVIS",
+                "Durante la última sesión, realicé las siguientes acciones:..."
+            ]
+        },
+        {
+            "fecha": "2026-06-10",
+            "temas": [
+                "Sesión de Asistencia",
+                "Abrir Archivo PDF"
+            ],
+            "decisiones": [
+                "Se buscará una nueva ruta para abrir el documento",
+                "Se probará con diferentes lectores de PDF"
+            ],
+            "archivos_modificados": [],
+            "hechos": [
+                "Abrelo en el gestor de pdf del pc",
+                "Ejecuta el siguiente comando para abrir el resumen del PDF directamente con el gestor de PDF predeterminado de tu sistema",
+                "El error indica que no se encontró el archivo especificado",
+                "El error indica que hay carpetas o archivos en la rutaC:\\Program Files\\para los cuales no tienes permisos de lectura",
+                "La salida indica que el archivoAcroRd32.exe se encontró en la rutaC:\\Program Files (x86)\\Adobe\\Acrobat 11.0\\Acrobat\\AcroRd32.exe",
+                "El documento PDF se ha abierto correctamente usando la aplicación predeterminada configurada en tu sistema"
+            ]
+        },
+        {
+            "fecha": "2026-06-10",
+            "temas": [
+                "abrir archivo PDF",
+                "solución de problemas"
+            ],
+            "decisiones": [
+                "reintentar abrir el archivo utilizando Adobe Acrobat Reader",
+                "verificar la instalación y configuración del lector de PDF"
+            ],
+            "archivos_modificados": [],
+            "hechos": [
+                "2026-06-10 12:06:46",
+                "USUARIO",
+                "Hola Jarvis",
+                "2026-06-10 12:07:35",
+                "USUARIO",
+                "Antes te mandé abrir un pdf y te dije que no se había abierto, pero fue error mio...se abrió perfectamente a la primera, no sabía que se llamaba prueba. Vuelve a abrirlo como hiciste la primera vez porque funcionó bien",
+                "2026-06-10 12:08:32",
+                "USUARIO",
+                "no, solo ver que funciona todo bien",
+                "2026-06-10 12:08:46",
+                "USUARIO",
+                "no se abrió",
+                "2026-06-10 12:10:00",
+                "JARVIS",
+                "Entendido, parece que hay un problema con la apertura del archivo. Vamos a intentar verificar si el archivo realmente existe en la ruta proporcionada y, si es necesario, buscamoslo de manera más detallada",
+                "2026-06-10 12:10:27",
+                "USUARIO",
+                "ya se abrió amigo",
+                "2026-06-10 12:12:07",
+                "USUARIO",
+                "perfecto, ya lo abriste...no es necesario que me sugieras como abrirlo si no te lo pido"
+            ]
+        },
+        {
+            "fecha": "2026-06-10",
+            "temas": [
+                "Gemini AI",
+                "Rutas de archivos"
+            ],
+            "decisiones": [
+                "El usuario debe buscar manualmente la ruta del archivo Gemini AI en el disco C:."
+            ],
+            "archivos_modificados": [],
+            "hechos": [
+                "Abre Gemini AI, está en el pc"
+            ]
+        },
+        {
+            "fecha": "2026-06-10",
+            "temas": [],
+            "decisiones": [
+                "Necesito verificar la ruta exacta del ejecutable de Gemini AI"
+            ],
+            "archivos_modificados": [],
+            "hechos": [
+                "usuario_request_open_gemini_ai",
+                "system_need_executable_path"
+            ]
+        },
+        {
+            "fecha": "2026-06-10",
+            "temas": [],
+            "decisiones": [],
+            "archivos_modificados": [],
+            "hechos": [
+                "Jarvis",
+                "abre",
+                "Gemini IA"
+            ]
+        },
+        {
+            "fecha": "2026-06-10",
+            "temas": [],
+            "decisiones": [
+                "Abrir Gemini"
+            ],
+            "archivos_modificados": [],
+            "hechos": [
+                "Jarvis",
+                "abre",
+                "Gemini"
+            ]
+        },
+        {
+            "fecha": "2026-06-10",
+            "temas": [
+                "Apertura de programas",
+                "Rutas de archivos"
+            ],
+            "decisiones": [
+                "Investigar ruta correcta del ejecutable de Gemini AI",
+                "Informar error a usuario"
+            ],
+            "archivos_modificados": [],
+            "hechos": [
+                "La ruta especificada para iniciar Gemini AIC:\\JARVIS2\\sandbox\\NombreApp.exe es incorrecta o el archivo no se encuentra en esa ubicación."
+            ]
+        },
+        {
+            "fecha": "2026-06-10",
+            "temas": [
+                "Gemini",
+                "Búsqueda de archivos"
+            ],
+            "decisiones": [
+                "Verificar manualmente los resultados",
+                "Seleccionar ruta específica"
+            ],
+            "archivos_modificados": [],
+            "hechos": []
+        },
+        {
+            "fecha": "2026-06-10",
+            "temas": [
+                "Apertura de sitios web"
+            ],
+            "decisiones": [
+                "Indicación al usuario sobre cómo confirmar si Gemini se abrió correctamente en el navegador"
+            ],
+            "archivos_modificados": [],
+            "hechos": [
+                " Jarvis, abre Gemini",
+                "La salida que ves indica que el comandoStart-Process https://gemini.google.com se ejecutó sin problemas y abrió la página de Gemini en tu navegador predeterminado"
+            ]
+        },
+        {
+            "fecha": "2026-06-10",
+            "temas": [
+                "Programación automática",
+                "Tareas diarias"
+            ],
+            "decisiones": [
+                "Prográmame una tarea para revisar memoria RAM todos los días a las 8:00 AM"
+            ],
+            "archivos_modificados": [
+                "Sandbox"
+            ],
+            "hechos": [
+                "2026-06-10 13:08:06",
+                "USUARIO",
+                "JARVIS, prográmate una tarea para todos los días a las 8:00 AM. A esa hora, quiero que revises la memoria RAM y me dejes un resumen escrito en la carpeta Sandbox."
+            ]
+        }
+    ]
+}
