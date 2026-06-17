@@ -18,7 +18,9 @@ $errores = 0
 $esPath = "C:\JARVIS2\herramientas\es.exe"
 if (Test-Path $esPath) {
     Write-Host "Usando Everything (es.exe) para busqueda ultra-rapida..." -ForegroundColor Cyan
-    $resultados = & $esPath $PatronBusqueda -n $LimiteResultados 2>$null
+    # Dividir el patron por espacios para que Everything busque todas las palabras en cualquier orden (operacion AND)
+    $argsBusqueda = $PatronBusqueda -split '\s+' | Where-Object { $_ -ne "" }
+    $resultados = & $esPath $argsBusqueda -n $LimiteResultados 2>$null
     if ($resultados) {
         foreach ($res in $resultados) {
             Write-Host $res
@@ -26,7 +28,19 @@ if (Test-Path $esPath) {
         }
     }
 } else {
-    Get-ChildItem -Path $RutaBase -Filter "*$PatronBusqueda*" -Recurse -File -ErrorAction SilentlyContinue | ForEach-Object {
+    # Si no esta Everything, hacemos busqueda recursiva y filtramos que contenga todas las palabras (operacion AND)
+    $filtros = $PatronBusqueda -split '\s+' | Where-Object { $_ -ne "" }
+    Get-ChildItem -Path $RutaBase -Recurse -File -ErrorAction SilentlyContinue | Where-Object {
+        $fullName = $_.FullName
+        $match = $true
+        foreach ($f in $filtros) {
+            if ($fullName -notlike "*$f*") {
+                $match = $false
+                break
+            }
+        }
+        $match
+    } | ForEach-Object {
         if ($contador -lt $LimiteResultados) {
             Write-Host $_.FullName
             $contador++

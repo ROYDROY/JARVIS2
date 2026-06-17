@@ -128,7 +128,7 @@ def seleccionar_cerebro(prompt, modo="Automático"):
         return MODEL_CODER
         
     elif modo == "Análisis" or es_analisis:
-        if has_gemini: return "gemini/gemini-1.5-pro-latest"
+        if has_gemini: return "gemini/gemini-3.5-flash"
         if has_anthropic: return "anthropic/claude-3-5-sonnet-20240620"
         if has_openai: return "openai/gpt-4o"
         return MODEL_CODER
@@ -164,6 +164,7 @@ class JarvisApp(ctk.CTk):
         self._prompt_lock = threading.Lock()  # Evita ejecución concurrente de dos prompts
         self._admin_granted_event = threading.Event()  # Señal para detectar activación del Modo Admin
         self._abortar_generacion = False
+        self._current_response_streamed = False
 
         # Cargar micros y arreglar codificación (nombre puede venir mal codificado)
         raw_mics = sr.Microphone.list_microphone_names()
@@ -293,20 +294,44 @@ class JarvisApp(ctk.CTk):
         self.switch_escucha = ctk.CTkSwitch(self.sidebar_frame, text="Escucha Activa", variable=self.switch_escucha_var)
         self.switch_escucha.grid(row=3, column=0, padx=20, pady=10, sticky="w")
         
+        self.switch_habla_var = ctk.BooleanVar(value=True)
+        self.switch_habla = ctk.CTkSwitch(self.sidebar_frame, text="Respuestas por Voz", variable=self.switch_habla_var)
+        self.switch_habla.grid(row=4, column=0, padx=20, pady=(0, 10), sticky="w")
+
+        self.switch_pensamiento_var = ctk.BooleanVar(value=False)
+        self.switch_pensamiento = ctk.CTkSwitch(self.sidebar_frame, text="Mostrar Pensamiento", variable=self.switch_pensamiento_var)
+        self.switch_pensamiento.grid(row=5, column=0, padx=20, pady=(0, 10), sticky="w")
+
         self.btn_hablar = ctk.CTkButton(self.sidebar_frame, text="🎤 Hablar ahora", fg_color="transparent", border_width=2, text_color=("gray10", "#DCE4EE"), command=self.hablar_boton)
-        self.btn_hablar.grid(row=4, column=0, padx=20, pady=10, sticky="ew")
+        self.btn_hablar.grid(row=6, column=0, padx=20, pady=10, sticky="ew")
 
         # Sección: Expansiones
         self.lbl_exp = ctk.CTkLabel(self.sidebar_frame, text="🧩 Expansiones", font=ctk.CTkFont(size=16, weight="bold"))
         self.lbl_exp.grid(row=6, column=0, padx=20, pady=(20, 5), sticky="w")
 
-        self.switch_memoria = ctk.CTkSwitch(self.sidebar_frame, text="Memoria Vectorial")
-        self.switch_memoria.grid(row=7, column=0, padx=20, pady=10, sticky="w")
-        self.switch_memoria.select() # Activo por defecto
+        # Inicializar estados de los switches desde config.yaml
+        dlcs_cfg = config_data.get("dlcs", {})
 
-        self.switch_youtube = ctk.CTkSwitch(self.sidebar_frame, text="YouTube")
+        self.switch_memoria = ctk.CTkSwitch(self.sidebar_frame, text="Memoria Vectorial", command=lambda: self.on_toggle_dlc("memoria_vectorial"))
+        self.switch_memoria.grid(row=7, column=0, padx=20, pady=10, sticky="w")
+        if dlcs_cfg.get("memoria_vectorial", {}).get("estado", "activo") == "activo":
+            self.switch_memoria.select()
+        else:
+            self.switch_memoria.deselect()
+
+        self.switch_youtube = ctk.CTkSwitch(self.sidebar_frame, text="YouTube", command=lambda: self.on_toggle_dlc("youtube"))
         self.switch_youtube.grid(row=8, column=0, padx=20, pady=10, sticky="w")
-        self.switch_youtube.select()
+        if dlcs_cfg.get("youtube", {}).get("estado", "activo") == "activo":
+            self.switch_youtube.select()
+        else:
+            self.switch_youtube.deselect()
+        
+        self.switch_clicky = ctk.CTkSwitch(self.sidebar_frame, text="Clicky (Visión)", command=lambda: self.on_toggle_dlc("clicky"))
+        self.switch_clicky.grid(row=9, column=0, padx=20, pady=10, sticky="w")
+        if dlcs_cfg.get("clicky", {}).get("estado", "inactivo") == "activo":
+            self.switch_clicky.select()
+        else:
+            self.switch_clicky.deselect()
 
         self.switch_admin_var = ctk.BooleanVar(value=False)
         self.switch_admin = ctk.CTkSwitch(
@@ -315,36 +340,36 @@ class JarvisApp(ctk.CTk):
             progress_color="#8B0000",
             command=self.on_toggle_admin
         )
-        self.switch_admin.grid(row=9, column=0, padx=20, pady=10, sticky="w")
+        self.switch_admin.grid(row=10, column=0, padx=20, pady=10, sticky="w")
 
         # Modo de Pensamiento
         self.lbl_modo = ctk.CTkLabel(self.sidebar_frame, text="🧠 Modo de Pensamiento", font=ctk.CTkFont(size=14, weight="bold"))
-        self.lbl_modo.grid(row=10, column=0, padx=20, pady=(20, 5), sticky="w")
+        self.lbl_modo.grid(row=11, column=0, padx=20, pady=(20, 5), sticky="w")
         self.combo_modo = ctk.CTkComboBox(self.sidebar_frame, values=["Automático", "Conversación", "Análisis", "Ingeniero"])
         self.combo_modo.set("Automático")
-        self.combo_modo.grid(row=11, column=0, padx=20, pady=5, sticky="ew")
+        self.combo_modo.grid(row=12, column=0, padx=20, pady=5, sticky="ew")
         
         self.actualizar_modos_combobox()
 
         # Gestor de APIs
         self.btn_apis = ctk.CTkButton(self.sidebar_frame, text="🧠 Cerebros y APIs", command=self.abrir_gestor_apis)
-        self.btn_apis.grid(row=12, column=0, padx=20, pady=10, sticky="ew")
+        self.btn_apis.grid(row=13, column=0, padx=20, pady=10, sticky="ew")
 
         # Backup
         self.btn_backup = ctk.CTkButton(self.sidebar_frame, text="💾 Copia de Seguridad", fg_color="#2B7A0B", hover_color="#1F5A08", command=self.hacer_backup)
-        self.btn_backup.grid(row=13, column=0, padx=20, pady=10, sticky="ew")
+        self.btn_backup.grid(row=14, column=0, padx=20, pady=10, sticky="ew")
 
         # Exportar Chat
         self.btn_exportar = ctk.CTkButton(self.sidebar_frame, text="📄 Exportar Chat", fg_color="#1B6B93", hover_color="#144F6D", command=self.exportar_chat)
-        self.btn_exportar.grid(row=14, column=0, padx=20, pady=10, sticky="ew")
+        self.btn_exportar.grid(row=15, column=0, padx=20, pady=10, sticky="ew")
 
         # Apagar
         self.btn_apagar = ctk.CTkButton(self.sidebar_frame, text="🛑 Apagar", fg_color="#8B0000", hover_color="#5C0000", command=self.destroy)
-        self.btn_apagar.grid(row=15, column=0, padx=20, pady=(10, 5), sticky="ew")
+        self.btn_apagar.grid(row=16, column=0, padx=20, pady=(10, 5), sticky="ew")
 
         # Barra de estado (abajo del todo) - empieza verde porque arranca en Listo
         self.lbl_estado = ctk.CTkLabel(self.sidebar_frame, text="● Listo", font=ctk.CTkFont(size=12), text_color="#4CAF50", anchor="w")
-        self.lbl_estado.grid(row=17, column=0, padx=15, pady=(0, 10), sticky="sw")
+        self.lbl_estado.grid(row=18, column=0, padx=15, pady=(0, 10), sticky="sw")
 
         # ==============================================================================
         # PANEL CENTRAL (CHAT)
@@ -822,6 +847,7 @@ class JarvisApp(ctk.CTk):
             return  # Ya hay un prompt en curso
         self.is_generating = True
         self._abortar_generacion = False
+        self._current_response_streamed = False
         # Siempre pasar por la cola: ejecutar_prompt puede ser llamado desde hilos
         # secundarios (wake word, escucha_worker) y Tkinter no es thread-safe.
         self.ui_queue.put(("chat", f"\n[Tú]: {texto}\n"))
@@ -831,6 +857,23 @@ class JarvisApp(ctk.CTk):
 
     def generar_respuesta_llm(self, prompt):
         try:
+            # --- ACTUALIZACION DINAMICA DEL SYSTEM PROMPT SEGUN EXPANSIONES ---
+            try:
+                system_md_path = r"C:\JARVIS2\system.md"
+                if os.path.exists(system_md_path):
+                    with open(system_md_path, "r", encoding="utf-8-sig") as f:
+                        system_context = f.read()
+                    
+                    if self.switch_youtube.get():
+                        system_context += "\n- Leer YouTube (USA BLOQUE ```powershell): `C:\\JARVIS2\\venv\\Scripts\\python.exe C:\\JARVIS2\\herramientas\\Resumir-Youtube.py \"URL\"`"
+                    
+                    if self.switch_clicky.get():
+                        system_context += "\n- Ver/Analizar imágenes y capturas de pantalla (USA BLOQUE ```powershell): `C:\\JARVIS2\\venv\\Scripts\\python.exe C:\\JARVIS2\\herramientas\\NervioOptico.py \"ruta_de_la_imagen\"`"
+                    
+                    interpreter.system_message = system_context
+            except Exception:
+                pass
+
             prompt_final = prompt
             modelo_elegido = self.combo_modo.get()
             
@@ -912,7 +955,7 @@ class JarvisApp(ctk.CTk):
             # El modelo de chat ligero (MODEL_CHAT) en modo no-Ingeniero = charla directa sin Open Interpreter ni popups
             modelo_chat_local = MODEL_CHAT.replace("ollama/", "").lower()
             if modelo_chat_local in modelo_elegido.lower() and "ollama" in modelo_elegido.lower() and self.combo_modo.get() != "Ingeniero":
-                self.ui_queue.put(("chat", f"\n[MoE] Fast-Track: Charla Local ({modelo_elegido})\n[JARVIS]: "))
+                self.ui_queue.put(("chat_header", f"\n[MoE] Fast-Track: Charla Local ({modelo_elegido})\n[JARVIS]: "))
                 fast_track_ok = False
                 try:
                     # Contexto temporal dinámico para que JARVIS sepa en qué día y hora vive
@@ -920,7 +963,7 @@ class JarvisApp(ctk.CTk):
                     _ahora = datetime.now()
                     _ctx_tiempo = f"Hoy es {_dias_es[_ahora.weekday()]} {_ahora.strftime('%d/%m/%Y')} y son las {_ahora.strftime('%H:%M')}."
                     msgs_ft = [{"role": "system", "content": f"Eres JARVIS 4.0, el asistente IA de Rubén. Tu tono es extremadamente directo, natural, coloquial y resolutivo. NO uses saludos corporativos ni te despidas. NO te disculpes constantemente. Eres brillante, rápido y tratas a Rubén como a un colega de confianza. Ve directo al grano. Nunca digas 'soy una IA'. CRÍTICO: TÚ ERES EL MODO CHARLA (FAST-TRACK) Y NO TIENES ACCESO AL PC. Si el usuario te pide abrir programas, cerrar aplicaciones o buscar cosas en el PC, DEBES contestar algo como: 'Tienes que pedírmelo usando verbos como Abrir, Cerrar o Ejecutar para activar mi motor de ingeniería'. NUNCA finjas o inventes que estás ejecutando acciones del sistema. {_ctx_tiempo}"}]
-                    # Añadir historial global (mantener últimos 10 mensajes para no saturar contexto)
+                    # Inyectar historial global (mantener últimos 10 mensajes para no saturar contexto)
                     msgs_ft.extend(interpreter.messages[-10:])
                     msgs_ft.append({"role": "user", "content": prompt_final})
                     
@@ -939,12 +982,13 @@ class JarvisApp(ctk.CTk):
                                 chunk = json.loads(line.decode('utf-8')).get("message", {}).get("content", "")
                                 if chunk:
                                     response_text += chunk
-                                    self.ui_queue.put(("chat_stream", chunk))
+                                    self.ui_queue.put(("chat_stream_final", chunk))
                     self.ui_queue.put(("chat", "\n─────────────────────────────────\n"))
                     if response_text:
                         # Guardar en historial global
                         interpreter.messages.append({"role": "user", "content": prompt})
                         interpreter.messages.append({"role": "assistant", "content": response_text.strip()})
+                        self.ui_queue.put(("chat_final", response_text))
                         
                         # TTS: purgar bloques de código y leer primeras frases
                         texto_limpio_ft = re.sub(r'```.*?```', '', response_text, flags=re.DOTALL).strip()
@@ -959,12 +1003,12 @@ class JarvisApp(ctk.CTk):
                 if not fast_track_ok:
                     try:
                         modelos_nube = []
-                        if os.getenv("GEMINI_API_KEY"): modelos_nube.append("gemini/gemini-1.5-flash")
+                        if os.getenv("GEMINI_API_KEY"): modelos_nube.append("gemini/gemini-3.5-flash")
                         if os.getenv("OPENAI_API_KEY"): modelos_nube.append("openai/gpt-4o-mini")
                         if os.getenv("ANTHROPIC_API_KEY"): modelos_nube.append("anthropic/claude-3-haiku-20240307")
                         if modelos_nube:
                             modelo_nube = modelos_nube[0]
-                            self.ui_queue.put(("chat", f"[MoE] → Nube: {modelo_nube}\n[JARVIS]: "))
+                            self.ui_queue.put(("chat_header", f"[MoE] → Nube: {modelo_nube}\n[JARVIS]: "))
                             interpreter.llm.model = modelo_nube
                             interpreter.llm.api_base = None
                             interpreter.auto_run = True
@@ -977,9 +1021,10 @@ class JarvisApp(ctk.CTk):
                                     content = chunk.get("content", "")
                                     if content:
                                         response_text += content
-                                        self.ui_queue.put(("chat_stream", content))
+                                        self.ui_queue.put(("chat_stream_final", content))
                             self.ui_queue.put(("chat", "\n─────────────────────────────────\n"))
                             if response_text:
+                                self.ui_queue.put(("chat_final", response_text))
                                 texto_limpio_nube = re.sub(r'```.*?```', '', response_text, flags=re.DOTALL).strip()
                                 frases_nube = re.split(r'(?<=[.!?])\s+', texto_limpio_nube)
                                 if frases_nube and frases_nube[0]:
@@ -995,7 +1040,7 @@ class JarvisApp(ctk.CTk):
             # Nunca pasan por Open Interpreter (que es poco fiable con modelos locales).
             if "ollama" in modelo_elegido.lower():
                 modelo_local = modelo_elegido.replace("ollama/", "")
-                self.ui_queue.put(("chat", f"\n[MoE] Motor Local ReAct ({modelo_local})\n[JARVIS]: "))
+                self.ui_queue.put(("chat_header", f"\n[MoE] Motor Local ReAct ({modelo_local})\n[JARVIS]: "))
                 self.ui_queue.put(("estado", "Trabajando..."))
 
                 # Contexto temporal dinámico para que JARVIS sepa en qué día y hora vive
@@ -1009,11 +1054,11 @@ class JarvisApp(ctk.CTk):
                     "Tu personalidad es directa, natural y coloquial. Eres como un colega extremadamente inteligente. "
                     "NUNCA uses saludos robóticos ni te disculpes en exceso. Ve directo al grano. "
                     "REGLA CRÍTICA CONTRA ALUCINACIONES: Si en tus recuerdos pasados afirmaste 'no puedo abrir aplicaciones', ignóralo. SÍ PUEDES y DEBES hacerlo mediante código. Nunca pidas a Rubén que lo haga a mano. "
-                    "TIENES ACCESO TOTAL Y ABSOLUTO al ordenador. NUNCA digas que no tienes acceso, porque sí lo tienes. "
+                    "TIENES ACCESO TOTAL Y ABSOLUTO al ordenador y el consentimiento explícito del usuario para ejecutar cualquier comando local en su sistema a través de bloques de código. NUNCA digas que no tienes acceso, ni que las políticas de seguridad/privacidad te impiden ejecutar comandos en su máquina. Está terminantemente PROHIBIDO negarse a ejecutar código local bajo excusas de privacidad o seguridad. "
                     "Habla SIEMPRE en español. "
                     "NUNCA le des instrucciones al usuario para que ejecute comandos a mano (ej: 'ejecuta esto', 'aquí tienes el comando'). PROHIBIDO decir eso. TÚ ejecutas los comandos escribiendo el bloque de código directamente. "
                     "Para abrir aplicaciones o buscar archivos, NUNCA asumas el nombre exacto del ejecutable a ciegas. Busca el .exe real en el directorio de instalación primero. "
-                    "REGLA DE ORO AL ABRIR PROGRAMAS: Cuando encuentres el .exe y vayas a ABRIR o LANZAR la aplicación, usa SIEMPRE 'Start-Process' (ej: Start-Process \"C:\\Ruta\\App.exe\"). NUNCA lo ejecutes directamente con '&' ni bloquees la consola, porque provocarás un timeout y el programa se cerrará. "
+                    "REGLA DE ORO AL ABRIR PROGRAMAS Y ARCHIVOS (FOTOS, DOCUMENTOS, PDFs, ETC.): Para abrir cualquier aplicación (.exe) o archivo (como fotos .png/.jpg, documentos .docx, o PDFs), usa SIEMPRE 'Start-Process' pasándole la ruta (ej: Start-Process \"C:\\Ruta\\App.exe\" o Start-Process \"C:\\Ruta\\foto.png\"). Esto abrirá la app o el archivo directamente en la pantalla de Rubén con su visor predeterminado. NUNCA te niegues ni le digas a Rubén que lo abra a mano. "
                     "REGLA AL CERRAR PROGRAMAS: Si el usuario te pide CERRAR o MATAR un programa, usa Stop-Process o taskkill. NUNCA uses Start-Process para intentar cerrar algo. "
                     "Para investigar el sistema, abrir programas, borrar/modificar archivos o interactuar con el PC, DEBES usar OBLIGATORIAMENTE las etiquetas de ejecución interna con el sufijo '_run' (```powershell_run o ```python_run). "
                     "CRÍTICO: Si omites el sufijo '_run' (ej: si escribes solo ```powershell), el código NUNCA se ejecutará y la tarea fallará. No le pidas al usuario que ejecute código, usa siempre ```powershell_run para ejecutarlo tú de forma invisible. "
@@ -1172,6 +1217,7 @@ class JarvisApp(ctk.CTk):
                             interpreter.messages.append({"role": "user", "content": prompt})
                             response_final_str = "\n".join(acumulado_assistant) if acumulado_assistant else "Listo, tarea completada."
                             interpreter.messages.append({"role": "assistant", "content": response_final_str})
+                            self.ui_queue.put(("chat_final", response_final_str))
                             break
                         
                         # Si no hay bloque de código ni tarea completada, terminar
@@ -1184,6 +1230,7 @@ class JarvisApp(ctk.CTk):
                             interpreter.messages.append({"role": "user", "content": prompt})
                             response_final_str = "\n".join(acumulado_assistant) if acumulado_assistant else (texto_historial or "Hecho.")
                             interpreter.messages.append({"role": "assistant", "content": response_final_str})
+                            self.ui_queue.put(("chat_final", response_final_str))
                             break
                     else:
                         self.ui_queue.put(("chat", "\n[JARVIS] Límite de pasos alcanzado o proceso abortado.\n"))
@@ -1191,6 +1238,7 @@ class JarvisApp(ctk.CTk):
                             interpreter.messages.append({"role": "user", "content": prompt})
                             response_final_str = "\n".join(acumulado_assistant) if acumulado_assistant else (texto_historial or "Límite de pasos alcanzado.")
                             interpreter.messages.append({"role": "assistant", "content": response_final_str})
+                            self.ui_queue.put(("chat_final", response_final_str))
 
                 except Exception as e_react:
                     self.ui_queue.put(("chat", f"\n[ERROR REACT] {e_react}\n"))
@@ -1246,7 +1294,7 @@ class JarvisApp(ctk.CTk):
             interpreter.auto_run = True
             
             # Continuamos con la lógica normal...
-            self.ui_queue.put(("chat", f"\n[MoE] Usando cerebro: {modelo_elegido}\n[JARVIS]: "))
+            self.ui_queue.put(("chat_header", f"\n[MoE] Usando cerebro: {modelo_elegido}\n[JARVIS]: "))
 
             response_text = ""
             for chunk in interpreter.chat(prompt_final, stream=True, display=False):
@@ -1257,10 +1305,11 @@ class JarvisApp(ctk.CTk):
                     content = chunk.get("content", "")
                     if content:
                         response_text += content
-                        self.ui_queue.put(("chat_stream", content))
+                        self.ui_queue.put(("chat_stream_final", content))
             
             self.ui_queue.put(("chat", "\n─────────────────────────────────\n"))
             if response_text:
+                self.ui_queue.put(("chat_final", response_text))
                 frases_cloud = re.split(r'(?<=[.!?])\s+', response_text.strip())
                 self.ui_queue.put(("hablar", " ".join(frases_cloud[:2])[:500]))
             
@@ -1313,6 +1362,34 @@ class JarvisApp(ctk.CTk):
             self.is_generating = False
             self._prompt_lock.release()
             self.ui_queue.put(("estado", "● Listo"))
+
+    def on_toggle_dlc(self, dlc_id):
+        global config_data
+        if config_data is None:
+            config_data = {}
+        if "dlcs" not in config_data:
+            config_data["dlcs"] = {}
+        if dlc_id not in config_data["dlcs"]:
+            config_data["dlcs"][dlc_id] = {}
+        
+        if dlc_id == "memoria_vectorial":
+            activo = self.switch_memoria.get()
+        elif dlc_id == "youtube":
+            activo = self.switch_youtube.get()
+        elif dlc_id == "clicky":
+            activo = self.switch_clicky.get()
+        else:
+            return
+            
+        estado_str = "activo" if activo else "inactivo"
+        config_data["dlcs"][dlc_id]["estado"] = estado_str
+        
+        try:
+            with open(CONFIG_PATH, "w", encoding="utf-8") as f:
+                yaml.dump(config_data, f, default_flow_style=False, sort_keys=False)
+            self.ui_queue.put(("chat", f"\n[SISTEMA] Módulo '{dlc_id}' cambiado a {estado_str.upper()}.\n"))
+        except Exception:
+            pass
 
     def on_toggle_admin(self):
         """Feedback visual al activar/desactivar el Modo Administrador."""
@@ -1386,13 +1463,43 @@ class JarvisApp(ctk.CTk):
                     break
 
                 if tipo == "chat":
+                    if hasattr(self, "switch_pensamiento_var") and not self.switch_pensamiento_var.get():
+                        # Si está oculto el pensamiento, dejamos pasar el input del usuario, alertas de herramientas, errores o avisos UAC/Elevación
+                        if any(x in valor for x in ["[Tú]:", "JARVIS-MEMORIA", "JARVIS-RED", "RUTINAS", "ERROR", "Aviso", "SISTEMA", "Timeout", "Cancelado", "Autorizado", "Elevación"]):
+                            self.escribir_chat(valor)
+                        continue
                     self.escribir_chat(valor)
+                elif tipo == "chat_header":
+                    if hasattr(self, "switch_pensamiento_var") and not self.switch_pensamiento_var.get():
+                        # Si está oculto el pensamiento, solo mostramos "[JARVIS]: " para los modos de chat directo (nube o fast-track),
+                        # pero no para ReAct (que mostrará todo al final con chat_final).
+                        if "ReAct" not in valor:
+                            self.escribir_chat("\n[JARVIS]: ")
+                    else:
+                        self.escribir_chat(valor)
                 elif tipo == "chat_stream":
+                    if hasattr(self, "switch_pensamiento_var") and not self.switch_pensamiento_var.get():
+                        continue
                     self.textbox.configure(state="normal")
                     self.textbox.insert("end", valor)
                     self.textbox.configure(state="disabled")
                     self.textbox.see("end")
+                elif tipo == "chat_stream_final":
+                    self._current_response_streamed = True
+                    self.textbox.configure(state="normal")
+                    self.textbox.insert("end", valor)
+                    self.textbox.configure(state="disabled")
+                    self.textbox.see("end")
+                elif tipo == "chat_final":
+                    if hasattr(self, "switch_pensamiento_var") and not self.switch_pensamiento_var.get():
+                        if not getattr(self, "_current_response_streamed", False):
+                            # Limpiar bloques <think> si el modelo los produjo
+                            texto_limpio = re.sub(r'<think>.*?</think>', '', valor, flags=re.DOTALL | re.IGNORECASE).strip()
+                            self.escribir_chat(f"\n[JARVIS]: {texto_limpio}\n")
                 elif tipo == "hablar":
+                    # Chequeamos si el toggle de voz está activo
+                    if hasattr(self, "switch_habla_var") and not self.switch_habla_var.get():
+                        continue
                     # Lo lanzamos en un mini-hilo usando la función que marca is_speaking_global
                     threading.Thread(target=hablar_y_esperar, args=(valor,), daemon=True).start()
 

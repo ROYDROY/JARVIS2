@@ -1,4 +1,4 @@
-﻿param(
+param(
     [string]$msg = ""
 )
 
@@ -38,6 +38,6 @@ if ($msg -eq "") {
     exit 0
 }
 
-git add jarvis.ps1 jarvis.exe launcher.py setup.ps1 system.md config.yaml
+git add jarvis.ps1 jarvis.exe jarvis_app.py setup.ps1 backup.ps1 system.md config.yaml README.md Manual_Usuario_JARVIS.docx Manual_Usuario_JARVIS.pdf scratch/update_manual.ps1
 git commit -m $msg
 Write-Host "    OK -- commit realizado: $msg" -ForegroundColor Green
