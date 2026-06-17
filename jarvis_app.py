@@ -1504,10 +1504,14 @@ class JarvisApp(ctk.CTk):
                         if not getattr(self, "_current_response_streamed", False):
                             # Limpiar bloques <think> si el modelo los produjo
                             texto_limpio = re.sub(r'<think>.*?</think>', '', valor, flags=re.DOTALL | re.IGNORECASE).strip()
-                            # Eliminar todos los bloques de código markdown (```...```)
-                            texto_limpio = re.sub(r'```.*?```', '', texto_limpio, flags=re.DOTALL).strip()
+                            # Eliminar todos los bloques de código markdown cerrados (```...```)
+                            texto_limpio = re.sub(r'```.*?```', '', texto_limpio, flags=re.DOTALL)
+                            # Eliminar bloques de código markdown que se hayan quedado abiertos al final del string por cortes en la generación
+                            texto_limpio = re.sub(r'```.*$', '', texto_limpio, flags=re.DOTALL)
                             # Eliminar etiquetas internas
-                            texto_limpio = texto_limpio.replace("[TAREA_COMPLETADA]", "").strip()
+                            texto_limpio = texto_limpio.replace("[TAREA_COMPLETADA]", "")
+                            # Normalizar saltos de línea múltiples redundantes
+                            texto_limpio = re.sub(r'\n\s*\n', '\n', texto_limpio).strip()
                             
                             # Si queda vacío, mostrar un mensaje de éxito limpio
                             if not texto_limpio:

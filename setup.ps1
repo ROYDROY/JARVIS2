@@ -213,7 +213,7 @@ $oiVersion = python -c "import importlib.metadata; print(importlib.metadata.vers
 if ($oiVersion -ne "0.3.4") {
     Write-Host "    Instalando dependencias base (Open Interpreter, ChromaDB, GUI, Gemini MoE)..." -ForegroundColor Gray
     python -m pip install --upgrade pip --quiet
-    pip install open-interpreter==0.3.4 chromadb customtkinter SpeechRecognition PyAudio python-dotenv duckduckgo-search pynput keyboard pyautogui windnd requests pyyaml --quiet
+    pip install open-interpreter==0.3.4 chromadb customtkinter SpeechRecognition PyAudio python-dotenv duckduckgo-search pynput keyboard pyautogui windnd requests pyyaml pillow --quiet
     Write-Host "    ADVERTENCIA: ignorar cualquier aviso de version mas nueva." -ForegroundColor DarkYellow
 }
 Write-Host "    OK -- Open Interpreter 0.3.4" -ForegroundColor Green

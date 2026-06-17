@@ -14,6 +14,13 @@ dlcs:
     estado: activo
     nombre: Devorador de YouTube
     tipo: python_script
+  clicky:
+    comando_desinstalar: ollama rm llava
+    comando_instalar: ollama pull llava
+    descripcion: "Activa los ojos de JARVIS (modelo visual Llava) para analizar y describir imágenes o capturas de pantalla."
+    estado: inactivo
+    nombre: Ojos de JARVIS (Clicky)
+    tipo: local_model
 local: true
 mic_index: 0
 model_chat: ollama/llama3.1:8b

@@ -99,6 +99,9 @@ def get_interpreter():
         if config_dlcs.get("youtube", {}).get("estado") == "activo":
             system_context += "\n- Leer YouTube (USA BLOQUE ```powershell): `C:\\JARVIS2\\venv\\Scripts\\python.exe C:\\JARVIS2\\herramientas\\Resumir-Youtube.py \"URL\"`"
             
+        if config_dlcs.get("clicky", {}).get("estado") == "activo":
+            system_context += "\n- Ver/Analizar imágenes y capturas de pantalla (USA BLOQUE ```powershell): `C:\\JARVIS2\\venv\\Scripts\\python.exe C:\\JARVIS2\\herramientas\\NervioOptico.py \"ruta_de_la_imagen\"`"
+            
         interpreter.system_message = system_context
     
     return interpreter

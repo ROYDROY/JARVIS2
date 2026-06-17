@@ -64,3 +64,21 @@ def analizar_imagen_con_llava(ruta_imagen):
     except Exception as e:
         print(f"\n[NERVIO ÓPTICO ERROR] Fallo al conectar con el modelo visual Llava: {e}")
         return None
+
+if __name__ == "__main__":
+    import sys
+    if len(sys.argv) < 2:
+        print("Uso: python NervioOptico.py <ruta_de_la_imagen>")
+        sys.exit(1)
+        
+    ruta_img = sys.argv[1]
+    ruta_img = ruta_img.strip('"\'')
+    if not os.path.isfile(ruta_img):
+        print(f"[ERROR] El archivo '{ruta_img}' no existe o no es accesible.")
+        sys.exit(1)
+        
+    resultado = analizar_imagen_con_llava(ruta_img)
+    if resultado:
+        print(resultado)
+    else:
+        print("[ERROR] No se pudo analizar la imagen con Llava.")

@@ -63,12 +63,31 @@ try {
         }
     }
 
+    # Forzar origen a cama plana (1) en los ítems secundarios del escáner para drivers reacios (como Epson)
+    try {
+        foreach ($subItem in $device.Items) {
+            foreach ($prop in $subItem.Properties) {
+                if ($prop.PropertyID -eq 3088 -or $prop.PropertyID -eq 3012) {
+                    try {
+                        $prop.Value = 1
+                        Write-Host "[INFO] Propiedad de ítem $($prop.PropertyID) configurada en Cama Plana (1)."
+                    } catch { }
+                }
+            }
+        }
+    } catch { }
+
     $tempFiles = @()
     $pageCounter = 1
     $continueScanning = $true
 
     while ($continueScanning) {
         Write-Host "[INFO] Escaneando página $pageCounter..."
+        
+        # Validar existencia de ítems en el escáner
+        if ($device.Items.Count -eq 0) {
+            throw "El dispositivo de escaneo no reportó ningún ítem de lectura disponible."
+        }
         
         # Connect to the scanner item
         $item = $device.Items.Item(1)
