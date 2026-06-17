@@ -1271,12 +1271,12 @@ class JarvisApp(ctk.CTk):
                                 print(f"[EJECUTANDO EN LÍNEA] {lang_b}:\n{code_b}")
                                 try:
                                     if lang_b == "python":
-                                        res_b = subprocess.run(["python", "-c", code_b], capture_output=True, text=True, timeout=60, encoding="utf-8", errors="replace")
+                                        res_b = subprocess.run(["python", "-c", code_b], capture_output=True, text=True, timeout=20, encoding="utf-8", errors="replace")
                                         salida_b = (res_b.stdout + res_b.stderr).strip() or "[Sin salida]"
                                     elif admin_on:
                                         salida_b = self.ejecutar_codigo_admin(code_b)
                                     else:
-                                        res_b = subprocess.run(["powershell", "-NoProfile", "-Command", code_b], capture_output=True, text=True, timeout=60, encoding="utf-8", errors="replace")
+                                        res_b = subprocess.run(["powershell", "-NoProfile", "-Command", code_b], capture_output=True, text=True, timeout=20, encoding="utf-8", errors="replace")
                                         salida_b = (res_b.stdout + res_b.stderr).strip() or "[Sin salida]"
                                         # Auto-detección de errores de permisos → solicitar Modo Admin y reintentar
                                         _perm_keys = ["acceso denegado", "access denied", "0x80070005", "permissiondenied", "requires elevation"]
