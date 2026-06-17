@@ -76,32 +76,45 @@ def seleccionar_cerebro(prompt, modo="Automático"):
     has_anthropic = bool(os.getenv("ANTHROPIC_API_KEY"))
     has_groq = bool(os.getenv("GROQ_API_KEY"))
     
+    # Detectar si hay un archivo adjunto en el prompt
+    tiene_archivo = "[Archivo:" in prompt
+    tiene_imagen = False
+    if tiene_archivo:
+        # Detectar extensiones comunes de imagen en la ruta
+        tiene_imagen = any(ext in prompt_lower for ext in [".jpg", ".jpeg", ".png", ".webp", ".bmp", ".gif"])
+    
     # Identificar tarea en modo Automático
     es_codigo = False
     es_analisis = False
     es_autonomo = False  # NUEVO: tareas que requieren ejecución real + escritura de archivos
     
     if modo == "Automático":
-        # Tareas autónomas pesadas: análisis del sistema, informes, auditorías
-        keywords_autonomo = ["audita", "analiza el pc", "analiza el ordenador", "analiza mi pc", "analiza mi ordenador",
-                             "genera un informe", "crea un informe", "escribe un informe",
-                             "investiga el", "diagnóstico", "diagnostico", "examina el sistema",
-                             "revisa el sistema", "escanea", "escan", "escán", "scann", "scaner"]
-        if any(k in prompt_lower for k in keywords_autonomo):
-            es_autonomo = True
+        if tiene_imagen:
+            es_analisis = True
+        elif tiene_archivo:
+            # Si tiene otro archivo no imagen, requiere ingeniería (leer pdf/excel/zip, etc.)
+            es_codigo = True
         else:
-            keywords_codigo = ["script", "código", "codigo", "programa", "error", "fall",
-                               "powershell", "python", "automatiza", "archivo", "carpeta",
-                               "ejecut", "comando", "json", "terminal", "consola", "instala", 
-                               "descarga", "arranca", "abr", "inicia", "cierr", "apaga", "reinicia",
-                               "borr", "elimin", "quit", "suprim", "destruy", "carg", "mat"]
-            if any(k in prompt_lower for k in keywords_codigo):
-                es_codigo = True
+            # Tareas autónomas pesadas: análisis del sistema, informes, auditorías
+            keywords_autonomo = ["audita", "analiza el pc", "analiza el ordenador", "analiza mi pc", "analiza mi ordenador",
+                                 "genera un informe", "crea un informe", "escribe un informe",
+                                 "investiga el", "diagnóstico", "diagnostico", "examina el sistema",
+                                 "revisa el sistema", "escanea", "escan", "escán", "scann", "scaner"]
+            if any(k in prompt_lower for k in keywords_autonomo):
+                es_autonomo = True
             else:
-                keywords_analisis = ["analiza", "resume", "largo", "imagen", "foto",
-                                     "explica a fondo", "traduce", "experto", "complejo", "redacta"]
-                if any(k in prompt_lower for k in keywords_analisis):
-                    es_analisis = True
+                keywords_codigo = ["script", "código", "codigo", "programa", "error", "fall",
+                                   "powershell", "python", "automatiza", "archivo", "carpeta",
+                                   "ejecut", "comando", "json", "terminal", "consola", "instala", 
+                                   "descarga", "arranca", "abr", "inicia", "cierr", "apaga", "reinicia",
+                                   "borr", "elimin", "quit", "suprim", "destruy", "carg", "mat"]
+                if any(k in prompt_lower for k in keywords_codigo):
+                    es_codigo = True
+                else:
+                    keywords_analisis = ["analiza", "resume", "largo", "imagen", "foto",
+                                         "explica a fondo", "traduce", "experto", "complejo", "redacta"]
+                    if any(k in prompt_lower for k in keywords_analisis):
+                        es_analisis = True
 
     # === RANKING DINÁMICO POR ROLES ===
     
@@ -118,23 +131,22 @@ def seleccionar_cerebro(prompt, modo="Automático"):
     
     # NIVEL 3 - Tareas autónomas complejas: Local potente primero, nube como red de seguridad
     if es_autonomo:
-        # Local: qwen2.5-coder:14b es 40x más grande que el 1.4b y sí ejecuta código real
-        return MODEL_CODER  # = ollama/qwen2.5-coder:14b por defecto
+        return MODEL_CODER 
     
     if modo == "Ingeniero" or es_codigo:
-        # Nube primero para código (más fiable), local como fallback
         if has_openai: return "openai/gpt-4o"
         if has_anthropic: return "anthropic/claude-3-5-sonnet-20240620"
         return MODEL_CODER
         
     elif modo == "Análisis" or es_analisis:
-        if has_gemini: return "gemini/gemini-3.5-flash"
+        if has_gemini: return "gemini/gemini-2.5-flash"
         if has_anthropic: return "anthropic/claude-3-5-sonnet-20240620"
         if has_openai: return "openai/gpt-4o"
         return MODEL_CODER
         
     elif modo == "Conversación":
-        if has_groq: return "groq/llama3-70b-8192"
+        # Evitar bypass de charla cuando hay archivos que procesar
+        if not tiene_archivo and has_groq: return "groq/llama3-70b-8192"
         return MODEL_CHAT
         
     # Defecto: charla ligera local
@@ -959,7 +971,9 @@ class JarvisApp(ctk.CTk):
             # --- BYPASS CHARLA RÁPIDA (FAST-TRACK) ---
             # El modelo de chat ligero (MODEL_CHAT) en modo no-Ingeniero = charla directa sin Open Interpreter ni popups
             modelo_chat_local = MODEL_CHAT.replace("ollama/", "").lower()
-            if modelo_chat_local in modelo_elegido.lower() and "ollama" in modelo_elegido.lower() and self.combo_modo.get() != "Ingeniero":
+            if (modelo_chat_local in modelo_elegido.lower() and "ollama" in modelo_elegido.lower() 
+                and self.combo_modo.get() != "Ingeniero" 
+                and "[Archivo:" not in prompt):
                 self.ui_queue.put(("chat_header", f"\n[MoE] Fast-Track: Charla Local ({modelo_elegido})\n[JARVIS]: "))
                 fast_track_ok = False
                 try:
@@ -1008,7 +1022,7 @@ class JarvisApp(ctk.CTk):
                 if not fast_track_ok:
                     try:
                         modelos_nube = []
-                        if os.getenv("GEMINI_API_KEY"): modelos_nube.append("gemini/gemini-3.5-flash")
+                        if os.getenv("GEMINI_API_KEY"): modelos_nube.append("gemini/gemini-2.5-flash")
                         if os.getenv("OPENAI_API_KEY"): modelos_nube.append("openai/gpt-4o-mini")
                         if os.getenv("ANTHROPIC_API_KEY"): modelos_nube.append("anthropic/claude-3-haiku-20240307")
                         if modelos_nube:
