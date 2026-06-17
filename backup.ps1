@@ -1,5 +1,7 @@
-# backup.ps1 - Copia de seguridad de JARVIS 4.0
-# Copia el código fuente excluyendo entornos virtuales, dependencias pesadas y binarios del instalador.
+param(
+    [string]$RutaDestino = "",
+    [switch]$Silencioso
+)
 
 $ErrorActionPreference = "Stop"
 $sourceDir = "C:\JARVIS2"
@@ -17,10 +19,17 @@ Write-Host "`n==== COPIA DE SEGURIDAD: JARVIS 4.0 ====" -ForegroundColor Cyan
 Write-Host "Este script creará un paquete ZIP del código de JARVIS" -ForegroundColor Gray
 Write-Host "excluyendo entornos virtuales (venv), repositorio git e instaladores.`n" -ForegroundColor Gray
 
-# Solicitar ruta destino al usuario
-$destinationDir = Read-Host "Introduce la ruta para guardar el backup (Pulsa Enter para usar el Escritorio: $desktopPath)"
+# Determinar ruta de destino de la copia
+$destinationDir = $RutaDestino
 if ([string]::IsNullOrWhiteSpace($destinationDir)) {
-    $destinationDir = $desktopPath
+    if ($Silencioso) {
+        $destinationDir = $desktopPath
+    } else {
+        $destinationDir = Read-Host "Introduce la ruta para guardar el backup (Pulsa Enter para usar el Escritorio: $desktopPath)"
+        if ([string]::IsNullOrWhiteSpace($destinationDir)) {
+            $destinationDir = $desktopPath
+        }
+    }
 }
 
 # Asegurar que el directorio de destino existe
@@ -86,5 +95,7 @@ try {
     }
 }
 
-Write-Host "`nPresiona cualquier tecla para terminar..." -ForegroundColor Gray
-$null = [Console]::ReadKey($true)
+if (-not $Silencioso) {
+    Write-Host "`nPresiona cualquier tecla para terminar..." -ForegroundColor Gray
+    $null = [Console]::ReadKey($true)
+}
