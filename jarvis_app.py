@@ -1091,17 +1091,20 @@ class JarvisApp(ctk.CTk):
                         if self._abortar_generacion:
                             self.ui_queue.put(("chat", "\n[JARVIS]: Proceso abortado.\n"))
                             break
-                        msgs_react = [{"role": "system", "content": SYSTEM_LOCAL}]
-                        # Añadir historial global previo filtrado (evitar bloqueos con llamadas a funciones de la nube)
+                        msgs_react = []
+                        # 1. Añadir historial global previo filtrado (evitar bloqueos con llamadas a funciones de la nube)
                         for m in interpreter.messages[-10:]:
                             if isinstance(m, dict):
                                 r = m.get("role", "user")
                                 c = m.get("content")
                                 if isinstance(c, str) and c.strip():
                                     msgs_react.append({"role": r, "content": c})
-                        # Añadir los pasos de razonamiento de este turno
+                        # 2. Añadir los pasos de razonamiento de este turno
                         for role_h, cont_h in historial_react:
                             msgs_react.append({"role": role_h, "content": cont_h})
+                        # 3. Inyectar el SYSTEM_LOCAL al final para que el modelo local lo tenga fresco en contexto
+                        msgs_react.append({"role": "system", "content": SYSTEM_LOCAL})
+                        # 4. Añadir el mensaje de usuario actual
                         msgs_react.append({"role": "user", "content": mensaje_turno})
 
                         payload_react = {"model": modelo_local, "messages": msgs_react, "stream": True}
