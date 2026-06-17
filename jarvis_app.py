@@ -920,8 +920,13 @@ class JarvisApp(ctk.CTk):
 
             # --- BUSCADOR EN INTERNET (DUCKDUCKGO) ---
             prompt_lower = prompt.lower()
-            keywords_busqueda = ["busca en internet", "busca en la red", "busca online", "busca en la web", "buscar en internet", "quien es", "quién es", "qué es", "que es", "noticias", "actualidad", "últimas", "último", "hoy", "precio", "tiempo hace"]
-            if any(k in prompt_lower for k in keywords_busqueda):
+            keywords_busqueda = [
+                r"\bbusca en internet\b", r"\bbusca en la red\b", r"\bbusca online\b", r"\bbusca en la web\b", 
+                r"\bbuscar en internet\b", r"\bquien es\b", r"\bquién es\b", r"\bqué es\b", r"\bque es\b", 
+                r"\bnoticias\b", r"\bactualidad\b", r"\búltimas\b", r"\búltimo\b", r"\bhoy\b", 
+                r"\bprecio\b", r"\btiempo hace\b"
+            ]
+            if any(re.search(patron, prompt_lower) for patron in keywords_busqueda):
                 try:
                     from Buscador import buscar_en_internet
                     self.ui_queue.put(("estado", "Buscando en la red..."))
