@@ -62,7 +62,9 @@ Cuando Jarvis utiliza el cerebro de Gemini 1.5 Pro, tiene habilitado el **OS Mod
 
 La GUI de JARVIS (`jarvis_app.py`) no es solo una terminal, cuenta con herramientas de ofimática integradas:
 1. **Exportación de Conversaciones:** Botón `📄 Exportar Chat` que permite guardar el registro en Markdown (`.md`), Texto Plano (`.txt`), o mandarlo directo a la impresora nativa de Windows.
-2. **Archivos Adjuntos (Visión y Parseo):** Puedes hacer *Drag & Drop* (arrastrar) de imágenes o archivos directamente sobre la interfaz (gracias a `windnd`), o usar el botón `📎`. JARVIS parseará la ruta automáticamente, y el motor LLM la procesará (ej: Gemini 3.5 leerá y analizará la imagen inyectada).
+2. **Archivos Adjuntos (Visión, REST y Fallback):** Puedes hacer *Drag & Drop* (arrastrar) de imágenes o archivos directamente sobre la interfaz (gracias a `windnd`), o usar el botón `📎`. JARVIS parseará la ruta automáticamente y, si se trata de un formato visual/PDF:
+   - **Bypass REST (Online):** Si hay conexión a internet y clave de Gemini activa, se invoca la API REST directa de Gemini 2.5 Flash (enviando el archivo codificado en Base64). Esto elude por completo los cuelgues o errores de formato de LiteLLM/Open Interpreter (`KeyError: 'type'`).
+   - **Fallback OCR Seguro (Offline):** Si estás offline o sin clave de Gemini, JARVIS invoca automáticamente `OCR-Seguro.py` para extraer el texto localmente (usando el OCR nativo de Windows 11 o el texto plano del PDF), inyecta dicho contenido en el prompt y ejecuta el razonamiento en tu modelo local de Ollama.
 3. **Consciencia Temporal:** En cada interacción se inyecta silenciosamente `datetime.now()` en el prompt del sistema, por lo que la IA siempre sabe el día, fecha y hora exacta sin tener que hacer llamadas a PowerShell.
 4. **Ocultación de Pensamientos (Chat Limpio):** El interruptor `Mostrar Pensamiento` del panel lateral permite ocultar la maraña de código de scripts intermedios y de razonamiento lógico técnico que genera el motor ReAct de Jarvis. Si está apagado, el chat mostrará una conversación totalmente limpia y fluida (sólo diálogos y alertas del sistema).
 
