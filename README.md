@@ -38,9 +38,9 @@ El proyecto vive en `C:\JARVIS2\`. Sus componentes clave son:
 
 ## 3. Sistema de Memoria y Contexto
 
-JARVIS2 no tiene una "memoria infinita" que satura al LLM. Usa un sistema híbrido:
-1. **Inyección en el Arranque:** `launcher.py` inyecta las últimas 3 sesiones de `memoria.json` y el contenido de `indice.json` directamente a la lista de mensajes `interpreter.messages`.
-2. **Procesamiento de Sesión:** Cuando se cierra JARVIS, el script `procesar_sesion.py` extrae un resumen algorítmico de los logs (`logs\sesion_actual.log`) extrayendo Hechos, Decisiones y Temas, y actualiza `memoria.json`.
+JARVIS2 utiliza un sistema híbrido de persistencia de contexto:
+1. **Memoria de Sesión (RAM a corto plazo):** Al arrancar, [jarvis_app.py](file:///C:/JARVIS2/jarvis_app.py) carga la conversación previa directamente desde [ram_history.json](file:///C:/JARVIS2/ram_history.json). Al finalizar una consulta, el historial completo se vuelve a volcar en este archivo para evitar que la IA pierda el hilo al reiniciar la aplicación.
+2. **Memoria Vectorial (Largo plazo - RAG):** Si está activo el interruptor del panel lateral, la conversación se inyecta en una base de datos vectorial local (ChromaDB en `vector_db`) usando incrustaciones locales de `nomic-embed-text`. Para consultas con suficiente contexto, se realiza una búsqueda de similitud y se recuperan recuerdos pasados útiles de forma dinámica, blindando al modelo contra alucinaciones del pasado.
 
 > [!WARNING]
 > Si en algún momento la memoria falla o alucina con datos personales del usuario, **EDITA `C:\JARVIS2\memoria\memoria.json` MANUALMENTE**. No intentes arreglarlo con código.
@@ -77,7 +77,7 @@ Las herramientas principales son:
 1. `Buscador.py`: Agente de búsqueda autónomo basado en DuckDuckGo. Implementa un filtro estricto anti-Wikipedia. Si la IA requiere información de actualidad o exterior, DEBE ejecutar este script.
 2. `Buscar-Archivo.ps1`: Capa de búsqueda de archivos locales. Nunca uses `Get-ChildItem -Recurse` desde la raíz. Utiliza `es.exe` de Everything CLI y ha sido mejorado para soportar búsquedas de palabras clave independientes (operador lógico AND), permitiendo buscar frases en cualquier orden (ej. 'control compras' encuentra 'Control de compras').
 3. `MotorVoz.py` / `NervioOptico.py`: Módulos periféricos de escucha pasiva, síntesis de voz y procesamiento de visión artificial.
-4. `Escanear-Documento.ps1`: Capa de escaneo de documentos multipágina interactivo. Digitaliza la primera página, gestiona cuadros de diálogo popups de Windows para añadir más páginas, compila el archivo PDF resultante y lo abre automáticamente en Acrobat Pro.
+4. `Escanear-Documento.ps1`: Capa de escaneo de documentos multipágina interactivo. Digitaliza la primera página de forma desatendida y directa. Cuenta con forzado de Flatbed (cama plana, propiedad `3088` y `3012`) tanto en el hardware como en cada ítem secundario de WIA, evitando la excepción `0x80210015` de alimentador vacío en escáneres Epson. Pregunta de forma interactiva si se desean escanear más páginas, compila el PDF resultante (utilizando Pillow) y lo abre en Acrobat Pro.
 
 **Para añadir una nueva Skill:**
 1. Escribe un script (Python o PowerShell) y guárdalo en `\herramientas\`.
@@ -87,9 +87,9 @@ Las herramientas principales son:
 
 ## 7. Protocolo de Ejecución y Compilación
 
-* **Auto Run:** En `launcher.py`, la variable `interpreter.auto_run` está configurada como `True`. JARVIS2 no pide confirmación (`y/n`) para ejecutar comandos. Está diseñado para velocidad total. Si entra en bucle, el usuario lo frena con `CTRL+C`.
+* **Auto Run:** En [jarvis_app.py](file:///C:/JARVIS2/jarvis_app.py), la variable `interpreter.auto_run` está configurada como `True` de forma predeterminada cuando se ejecutan comandos aprobados. Está diseñado para velocidad total. Si entra en bucle, el usuario lo frena con la tecla `ESC` o `CTRL+C`.
 * **Arranque del Sistema:** Para arrancar JARVIS sin mostrar la consola de comandos de fondo, ejecuta el script `lanzar_silencioso.vbs` o utiliza el acceso directo configurado en el Escritorio.
-* **Actualización del Sistema:** Si una IA hace cambios profundos en el código base (`launcher.py`, `jarvis.ps1`, dependencias nuevas), se **DEBE** recompilar el ejecutable.
+* **Actualización del Sistema:** Si una IA hace cambios profundos en el código base ([jarvis_app.py](file:///C:/JARVIS2/jarvis_app.py), `jarvis.ps1`, dependencias nuevas), se **DEBE** recompilar el ejecutable.
 * **Comando para compilar:** `powershell -ExecutionPolicy Bypass -File C:\JARVIS2\build.ps1 -msg "Mensaje del commit"`
 * **Dependencias de Python:** Siempre se operan desde `C:\JARVIS2\venv\Scripts\python.exe -m pip install <paquete>`. Nunca en la instalación global.
 
