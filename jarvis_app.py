@@ -869,6 +869,18 @@ class JarvisApp(ctk.CTk):
 
     def generar_respuesta_llm(self, prompt):
         try:
+            # --- DETECCION Y ENVOLTORIO AUTOMATICO DE RUTAS DE ARCHIVOS ---
+            import re
+            prompt_final = prompt
+            patron_ruta = r'([a-zA-Z]:\\[^"\'\r\n\t\<\>\@\|]+?\.(?:png|jpe?g|gif|webp|bmp|pdf|docx?|xlsx?|txt|json|csv|zip|rar))'
+            for ruta in re.findall(patron_ruta, prompt, flags=re.IGNORECASE):
+                # Comprobar si ya está envuelta en [Archivo: ...]
+                if not re.search(r'\[Archivo:\s*' + re.escape(ruta) + r'\]', prompt_final, flags=re.IGNORECASE):
+                    tag_archivo = f"[Archivo: {ruta}]"
+                    # Reemplazar la ruta (con o sin comillas a su alrededor) por el tag de archivo
+                    prompt_final = re.sub(r'"?' + re.escape(ruta) + r'"?', tag_archivo, prompt_final)
+            prompt = prompt_final
+
             # --- ACTUALIZACION DINAMICA DEL SYSTEM PROMPT SEGUN EXPANSIONES ---
             try:
                 system_md_path = r"C:\JARVIS2\system.md"
