@@ -877,8 +877,13 @@ class JarvisApp(ctk.CTk):
                 # Comprobar si ya está envuelta en [Archivo: ...]
                 if not re.search(r'\[Archivo:\s*' + re.escape(ruta) + r'\]', prompt_final, flags=re.IGNORECASE):
                     tag_archivo = f"[Archivo: {ruta}]"
-                    # Reemplazar la ruta (con o sin comillas a su alrededor) por el tag de archivo
-                    prompt_final = re.sub(r'"?' + re.escape(ruta) + r'"?', tag_archivo, prompt_final)
+                    # Usamos .replace() en lugar de re.sub para evitar errores de escape con barras invertidas en Windows (ej: \D)
+                    if f'"{ruta}"' in prompt_final:
+                        prompt_final = prompt_final.replace(f'"{ruta}"', tag_archivo)
+                    elif f"'{ruta}'" in prompt_final:
+                        prompt_final = prompt_final.replace(f"'{ruta}'", tag_archivo)
+                    else:
+                        prompt_final = prompt_final.replace(ruta, tag_archivo)
             prompt = prompt_final
 
             # --- ACTUALIZACION DINAMICA DEL SYSTEM PROMPT SEGUN EXPANSIONES ---
