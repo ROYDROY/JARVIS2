@@ -890,6 +890,47 @@ class JarvisApp(ctk.CTk):
                     else:
                         prompt_final = prompt_final.replace(ruta, tag_archivo)
             prompt = prompt_final
+            
+            # --- DETECCION DE ARCHIVOS VISUALES Y PDF PARA MANEJO DE OCR/REST ---
+            tiene_archivo_img_pdf = False
+            ruta_archivo_detectada = None
+            forzar_local = False
+            
+            match_archivo = re.search(r'\[Archivo:\s*(.+?)\]', prompt_final, flags=re.IGNORECASE)
+            if match_archivo:
+                ruta_posible = match_archivo.group(1).strip()
+                ext = os.path.splitext(ruta_posible)[1].lower()
+                if ext in [".png", ".jpg", ".jpeg", ".webp", ".bmp", ".gif", ".pdf"]:
+                    tiene_archivo_img_pdf = True
+                    ruta_archivo_detectada = ruta_posible
+
+            # Verificar conectividad para decidir bypass/fallback
+            online = False
+            if tiene_archivo_img_pdf:
+                try:
+                    requests.get("https://generativelanguage.googleapis.com", timeout=2)
+                    online = True
+                except Exception:
+                    online = False
+
+            if tiene_archivo_img_pdf and (not online or not os.getenv("GEMINI_API_KEY")):
+                self.ui_queue.put(("chat", "\n[JARVIS-RED] Sin conexión o clave Gemini. Extrayendo texto con OCR local seguro...\n"))
+                self.ui_queue.put(("estado", "Procesando OCR local..."))
+                
+                # Ejecutar OCR-Seguro.py localmente
+                res_ocr = subprocess.run(
+                    ["python", r"C:\JARVIS2\herramientas\OCR-Seguro.py", ruta_archivo_detectada],
+                    capture_output=True, text=True, encoding="utf-8", errors="replace"
+                )
+                texto_ocr = res_ocr.stdout.strip()
+                
+                # Reemplazar la etiqueta por el texto extraído del OCR
+                prompt_final = prompt_final.replace(f"[Archivo: {ruta_archivo_detectada}]", f"\n[TEXTO EXTRAÍDO DEL DOCUMENTO MEDIANTE OCR LOCAL]:\n{texto_ocr}\n")
+                prompt = prompt_final
+                
+                # Forzar modelo local y desactivar el indicador visual para el resto del flujo
+                tiene_archivo_img_pdf = False
+                forzar_local = True
 
             # --- ACTUALIZACION DINAMICA DEL SYSTEM PROMPT SEGUN EXPANSIONES ---
             try:
@@ -974,7 +1015,10 @@ class JarvisApp(ctk.CTk):
                     self.ui_queue.put(("estado", "Pensando..."))
 
             # --- SELECCIÓN CEREBRO MoE ---
-            modelo_elegido = seleccionar_cerebro(prompt, self.combo_modo.get())
+            if forzar_local:
+                modelo_elegido = MODEL_CODER
+            else:
+                modelo_elegido = seleccionar_cerebro(prompt, self.combo_modo.get())
             interpreter.llm.model = modelo_elegido
             
             # Cortafuegos dinámico y Modo OS
@@ -1339,6 +1383,84 @@ class JarvisApp(ctk.CTk):
             interpreter.auto_run = True
             
             # Continuamos con la lógica normal...
+            
+            # --- BYPASS REST DIRECTO PARA VISION EN GEMINI ---
+            if tiene_archivo_img_pdf and online and "gemini" in modelo_elegido.lower():
+                self.ui_queue.put(("chat_header", f"\n[MoE] Usando cerebro (Nube Directa REST): {modelo_elegido}\n[JARVIS]: "))
+                self.ui_queue.put(("estado", "Analizando documento con Gemini..."))
+                
+                import base64
+                try:
+                    with open(ruta_archivo_detectada, "rb") as f_img:
+                        encoded_data = base64.b64encode(f_img.read()).decode("utf-8")
+                    
+                    mime_type = "image/jpeg"
+                    ext = os.path.splitext(ruta_archivo_detectada)[1].lower()
+                    if ext in [".png"]: mime_type = "image/png"
+                    elif ext in [".webp"]: mime_type = "image/webp"
+                    elif ext in [".pdf"]: mime_type = "application/pdf"
+                    
+                    gemini_key = os.getenv("GEMINI_API_KEY").strip("'\" ")
+                    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={gemini_key}"
+                    headers = {"Content-Type": "application/json"}
+                    
+                    contents_payload = []
+                    # Inyectar historial de RAM
+                    for m in interpreter.messages[-10:]:
+                        r = m.get("role")
+                        c = m.get("content")
+                        if r == "user" and c:
+                            contents_payload.append({
+                                "role": "user",
+                                "parts": [{"text": c}]
+                            })
+                        elif r == "assistant" and c:
+                            contents_payload.append({
+                                "role": "model",
+                                "parts": [{"text": c}]
+                            })
+                    
+                    # Turno actual
+                    prompt_sin_tag = prompt.replace(f"[Archivo: {ruta_archivo_detectada}]", "").strip()
+                    contents_payload.append({
+                        "role": "user",
+                        "parts": [
+                            {"text": prompt_sin_tag},
+                            {
+                                "inlineData": {
+                                    "mimeType": mime_type,
+                                    "data": encoded_data
+                                }
+                            }
+                        ]
+                    })
+                    
+                    payload = {"contents": contents_payload}
+                    
+                    response = requests.post(url, json=payload, headers=headers, timeout=45)
+                    response.raise_for_status()
+                    
+                    result = response.json()
+                    candidates = result.get("candidates", [])
+                    if candidates:
+                        response_text = candidates[0]["content"]["parts"][0]["text"].strip()
+                        self.ui_queue.put(("chat_stream_final", response_text))
+                    else:
+                        response_text = "No se obtuvo respuesta de Gemini."
+                        self.ui_queue.put(("chat_stream_final", response_text))
+                except Exception as ex_rest:
+                    response_text = f"Error al consultar la API de Gemini: {ex_rest}"
+                    self.ui_queue.put(("chat_stream_final", response_text))
+                
+                self.ui_queue.put(("chat", "\n─────────────────────────────────\n"))
+                if response_text:
+                    interpreter.messages.append({"role": "user", "content": prompt})
+                    interpreter.messages.append({"role": "assistant", "content": response_text})
+                    self.ui_queue.put(("chat_final", response_text))
+                    frases_cloud = re.split(r'(?<=[.!?])\s+', response_text.strip())
+                    self.ui_queue.put(("hablar", " ".join(frases_cloud[:2])[:500]))
+                return
+
             self.ui_queue.put(("chat_header", f"\n[MoE] Usando cerebro: {modelo_elegido}\n[JARVIS]: "))
 
             response_text = ""
