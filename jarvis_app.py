@@ -1503,6 +1503,14 @@ class JarvisApp(ctk.CTk):
                         if not getattr(self, "_current_response_streamed", False):
                             # Limpiar bloques <think> si el modelo los produjo
                             texto_limpio = re.sub(r'<think>.*?</think>', '', valor, flags=re.DOTALL | re.IGNORECASE).strip()
+                            # Eliminar todos los bloques de código markdown (```...```)
+                            texto_limpio = re.sub(r'```.*?```', '', texto_limpio, flags=re.DOTALL).strip()
+                            # Eliminar etiquetas internas
+                            texto_limpio = texto_limpio.replace("[TAREA_COMPLETADA]", "").strip()
+                            
+                            # Si queda vacío, mostrar un mensaje de éxito limpio
+                            if not texto_limpio:
+                                texto_limpio = "Listo, tarea completada."
                             self.escribir_chat(f"\n[JARVIS]: {texto_limpio}\n")
                 elif tipo == "hablar":
                     # Chequeamos si el toggle de voz está activo
