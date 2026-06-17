@@ -21,7 +21,12 @@ from datetime import datetime
 from dotenv import load_dotenv, set_key
 
 # Cargar credenciales al arrancar
-load_dotenv(r"C:\JARVIS2\.env")
+load_dotenv(r"C:\JARVIS2\.env", override=True)
+
+# Limpiar comillas accidentales de las variables de entorno para evitar fallos de LiteLLM/Open Interpreter
+for api_key_name in ["GEMINI_API_KEY", "OPENAI_API_KEY", "ANTHROPIC_API_KEY", "GROQ_API_KEY", "GOOGLE_API_KEY"]:
+    if os.getenv(api_key_name):
+        os.environ[api_key_name] = os.environ[api_key_name].strip("'\" ")
 
 # ==============================================================================
 # IMPORTACIONES JARVIS
