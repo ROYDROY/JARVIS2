@@ -50,6 +50,19 @@ try {
     Write-Host "[INFO] Conectando al primer escáner disponible..."
     $device = $deviceManager.DeviceInfos.Item(1).Connect()
 
+    # Configurar origen en cama plana (Flatbed = 1) para evitar error de alimentador vacío (0x80210015)
+    $WIA_IPS_DOCUMENT_HANDLING_SELECT = 3088
+    foreach ($prop in $device.Properties) {
+        if ($prop.PropertyID -eq $WIA_IPS_DOCUMENT_HANDLING_SELECT) {
+            try {
+                $prop.Value = 1 # Force Flatbed (Cama Plana)
+                Write-Host "[INFO] Origen de escaneo configurado en cama plana (Flatbed) de forma predeterminada."
+            } catch {
+                # Ignorar si el controlador de este escáner específico no soporta o permite cambiar esta propiedad
+            }
+        }
+    }
+
     $tempFiles = @()
     $pageCounter = 1
     $continueScanning = $true
