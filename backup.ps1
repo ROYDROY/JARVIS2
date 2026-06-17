@@ -12,8 +12,11 @@ if (-not (Test-Path $sourceDir)) {
     exit 1
 }
 
-# Obtener ruta de Escritorio por defecto
-$desktopPath = [System.Environment]::GetFolderPath([System.Environment+SpecialFolder]::Desktop)
+# Obtener ruta de destino predeterminada (unidad D de seguridad como prioridad, Escritorio como fallback)
+$defaultBackupPath = "D:\DISCOS SEGURIDAD\PROGRAMAS ESCRITORIO\IA\JARVIS"
+if (-not (Test-Path $defaultBackupPath)) {
+    $defaultBackupPath = [System.Environment]::GetFolderPath([System.Environment+SpecialFolder]::Desktop)
+}
 
 Write-Host "`n==== COPIA DE SEGURIDAD: JARVIS 4.0 ====" -ForegroundColor Cyan
 Write-Host "Este script creará un paquete ZIP del código de JARVIS" -ForegroundColor Gray
@@ -23,11 +26,11 @@ Write-Host "excluyendo entornos virtuales (venv), repositorio git e instaladores
 $destinationDir = $RutaDestino
 if ([string]::IsNullOrWhiteSpace($destinationDir)) {
     if ($Silencioso) {
-        $destinationDir = $desktopPath
+        $destinationDir = $defaultBackupPath
     } else {
-        $destinationDir = Read-Host "Introduce la ruta para guardar el backup (Pulsa Enter para usar el Escritorio: $desktopPath)"
+        $destinationDir = Read-Host "Introduce la ruta para guardar el backup (Pulsa Enter para usar la ruta por defecto: $defaultBackupPath)"
         if ([string]::IsNullOrWhiteSpace($destinationDir)) {
-            $destinationDir = $desktopPath
+            $destinationDir = $defaultBackupPath
         }
     }
 }
@@ -44,7 +47,7 @@ if (-not (Test-Path $destinationDir)) {
 
 # Nombre del archivo ZIP de salida
 $timestamp = Get-Date -Format "yyyy-MM-dd_HH-mm-ss"
-$zipName = "JARVIS_BACKUP_$timestamp.zip"
+$zipName = "JARVIS2_STABLE_$timestamp.zip"
 $zipPath = Join-Path $destinationDir $zipName
 
 # Carpeta temporal para empaquetar
