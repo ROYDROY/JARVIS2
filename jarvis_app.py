@@ -183,18 +183,9 @@ class JarvisApp(ctk.CTk):
         self._abortar_generacion = False
         self._current_response_streamed = False
 
-        # Cargar micros y arreglar codificación (nombre puede venir mal codificado)
-        raw_mics = sr.Microphone.list_microphone_names()
+        # Simplificar opciones de micrófono: usar sólo el predeterminado de Windows
         self.mics = ["Predeterminado de Windows"]
-        for m in raw_mics:
-            try:
-                self.mics.append(m.encode('latin1').decode('utf-8'))
-            except Exception:
-                self.mics.append(m)
-                
-        idx_guardado = config_data.get("mic_index", 0) if config_data else 0
-        if idx_guardado >= len(self.mics): idx_guardado = 0
-        self.selected_mic_index = idx_guardado
+        self.selected_mic_index = 0
 
         self.construir_ui()
         
@@ -324,27 +315,27 @@ class JarvisApp(ctk.CTk):
 
         # Sección: Expansiones
         self.lbl_exp = ctk.CTkLabel(self.sidebar_frame, text="🧩 Expansiones", font=ctk.CTkFont(size=16, weight="bold"))
-        self.lbl_exp.grid(row=6, column=0, padx=20, pady=(20, 5), sticky="w")
+        self.lbl_exp.grid(row=7, column=0, padx=20, pady=(20, 5), sticky="w")
 
         # Inicializar estados de los switches desde config.yaml
         dlcs_cfg = config_data.get("dlcs", {})
 
         self.switch_memoria = ctk.CTkSwitch(self.sidebar_frame, text="Memoria Vectorial", command=lambda: self.on_toggle_dlc("memoria_vectorial"))
-        self.switch_memoria.grid(row=7, column=0, padx=20, pady=10, sticky="w")
+        self.switch_memoria.grid(row=8, column=0, padx=20, pady=10, sticky="w")
         if dlcs_cfg.get("memoria_vectorial", {}).get("estado", "activo") == "activo":
             self.switch_memoria.select()
         else:
             self.switch_memoria.deselect()
 
         self.switch_youtube = ctk.CTkSwitch(self.sidebar_frame, text="YouTube", command=lambda: self.on_toggle_dlc("youtube"))
-        self.switch_youtube.grid(row=8, column=0, padx=20, pady=10, sticky="w")
+        self.switch_youtube.grid(row=9, column=0, padx=20, pady=10, sticky="w")
         if dlcs_cfg.get("youtube", {}).get("estado", "activo") == "activo":
             self.switch_youtube.select()
         else:
             self.switch_youtube.deselect()
         
         self.switch_clicky = ctk.CTkSwitch(self.sidebar_frame, text="Clicky (Visión)", command=lambda: self.on_toggle_dlc("clicky"))
-        self.switch_clicky.grid(row=9, column=0, padx=20, pady=10, sticky="w")
+        self.switch_clicky.grid(row=10, column=0, padx=20, pady=10, sticky="w")
         if dlcs_cfg.get("clicky", {}).get("estado", "inactivo") == "activo":
             self.switch_clicky.select()
         else:
@@ -357,36 +348,45 @@ class JarvisApp(ctk.CTk):
             progress_color="#8B0000",
             command=self.on_toggle_admin
         )
-        self.switch_admin.grid(row=10, column=0, padx=20, pady=10, sticky="w")
+        self.switch_admin.grid(row=11, column=0, padx=20, pady=10, sticky="w")
+
+        self.switch_nvidia_var = ctk.BooleanVar(value=False)
+        self.switch_nvidia = ctk.CTkSwitch(
+            self.sidebar_frame, text="☁️ Cerebro NVIDIA (Cloud)",
+            variable=self.switch_nvidia_var,
+            progress_color="#00A9FF",
+            command=self.on_toggle_nvidia
+        )
+        self.switch_nvidia.grid(row=12, column=0, padx=20, pady=10, sticky="w")
 
         # Modo de Pensamiento
         self.lbl_modo = ctk.CTkLabel(self.sidebar_frame, text="🧠 Modo de Pensamiento", font=ctk.CTkFont(size=14, weight="bold"))
-        self.lbl_modo.grid(row=11, column=0, padx=20, pady=(20, 5), sticky="w")
+        self.lbl_modo.grid(row=13, column=0, padx=20, pady=(20, 5), sticky="w")
         self.combo_modo = ctk.CTkComboBox(self.sidebar_frame, values=["Automático", "Conversación", "Análisis", "Ingeniero"])
         self.combo_modo.set("Automático")
-        self.combo_modo.grid(row=12, column=0, padx=20, pady=5, sticky="ew")
+        self.combo_modo.grid(row=14, column=0, padx=20, pady=5, sticky="ew")
         
         self.actualizar_modos_combobox()
 
         # Gestor de APIs
         self.btn_apis = ctk.CTkButton(self.sidebar_frame, text="🧠 Cerebros y APIs", command=self.abrir_gestor_apis)
-        self.btn_apis.grid(row=13, column=0, padx=20, pady=10, sticky="ew")
+        self.btn_apis.grid(row=14, column=0, padx=20, pady=10, sticky="ew")
 
         # Backup
         self.btn_backup = ctk.CTkButton(self.sidebar_frame, text="💾 Copia de Seguridad", fg_color="#2B7A0B", hover_color="#1F5A08", command=self.hacer_backup)
-        self.btn_backup.grid(row=14, column=0, padx=20, pady=10, sticky="ew")
+        self.btn_backup.grid(row=15, column=0, padx=20, pady=10, sticky="ew")
 
         # Exportar Chat
         self.btn_exportar = ctk.CTkButton(self.sidebar_frame, text="📄 Exportar Chat", fg_color="#1B6B93", hover_color="#144F6D", command=self.exportar_chat)
-        self.btn_exportar.grid(row=15, column=0, padx=20, pady=10, sticky="ew")
+        self.btn_exportar.grid(row=16, column=0, padx=20, pady=10, sticky="ew")
 
         # Apagar
         self.btn_apagar = ctk.CTkButton(self.sidebar_frame, text="🛑 Apagar", fg_color="#8B0000", hover_color="#5C0000", command=self.destroy)
-        self.btn_apagar.grid(row=16, column=0, padx=20, pady=(10, 5), sticky="ew")
+        self.btn_apagar.grid(row=17, column=0, padx=20, pady=(10, 5), sticky="ew")
 
         # Barra de estado (abajo del todo) - empieza verde porque arranca en Listo
         self.lbl_estado = ctk.CTkLabel(self.sidebar_frame, text="● Listo", font=ctk.CTkFont(size=12), text_color="#4CAF50", anchor="w")
-        self.lbl_estado.grid(row=18, column=0, padx=15, pady=(0, 10), sticky="sw")
+        self.lbl_estado.grid(row=19, column=0, padx=15, pady=(0, 10), sticky="sw")
 
         # ==============================================================================
         # PANEL CENTRAL (CHAT)
@@ -1039,7 +1039,8 @@ class JarvisApp(ctk.CTk):
             modelo_chat_local = MODEL_CHAT.replace("ollama/", "").lower()
             if (modelo_chat_local in modelo_elegido.lower() and "ollama" in modelo_elegido.lower() 
                 and self.combo_modo.get() != "Ingeniero" 
-                and "[Archivo:" not in prompt):
+                and "[Archivo:" not in prompt
+                and not self.switch_nvidia_var.get()):
                 self.ui_queue.put(("chat_header", f"\n[MoE] Fast-Track: Charla Local ({modelo_elegido})\n[JARVIS]: "))
                 fast_track_ok = False
                 try:
@@ -1125,7 +1126,10 @@ class JarvisApp(ctk.CTk):
             # Nunca pasan por Open Interpreter (que es poco fiable con modelos locales).
             if "ollama" in modelo_elegido.lower():
                 modelo_local = modelo_elegido.replace("ollama/", "")
-                self.ui_queue.put(("chat_header", f"\n[MoE] Motor Local ReAct ({modelo_local})\n[JARVIS]: "))
+                if self.switch_nvidia_var.get():
+                    self.ui_queue.put(("chat_header", f"\n[Cerebro NVIDIA] Motor Nube NIM (Llama-3.1-70B)\n[JARVIS]: "))
+                else:
+                    self.ui_queue.put(("chat_header", f"\n[MoE] Motor Local ReAct ({modelo_local})\n[JARVIS]: "))
                 self.ui_queue.put(("estado", "Trabajando..."))
 
                 # Contexto temporal dinámico para que JARVIS sepa en qué día y hora vive
@@ -1133,39 +1137,19 @@ class JarvisApp(ctk.CTk):
                 _ahora = datetime.now()
                 _ctx_tiempo = f"CONTEXTO TEMPORAL: Hoy es {_dias_es[_ahora.weekday()]} {_ahora.strftime('%d/%m/%Y')} y son las {_ahora.strftime('%H:%M')}. Usa esta información para contextualizar tus respuestas (saludos, referencias al día, etc.)."
 
-                SYSTEM_LOCAL = (
-                    "Eres JARVIS 4.0, el asistente personal avanzado de Rubén (Windows 11 Pro). "
-                    f"{_ctx_tiempo} "
-                    "Tu personalidad es directa, natural y coloquial. Eres como un colega extremadamente inteligente. "
-                    "NUNCA uses saludos robóticos ni te disculpes en exceso. Ve directo al grano. "
-                    "REGLA CRÍTICA CONTRA ALUCINACIONES: Si en tus recuerdos pasados afirmaste 'no puedo abrir aplicaciones', ignóralo. SÍ PUEDES y DEBES hacerlo mediante código. Nunca pidas a Rubén que lo haga a mano. "
-                    "TIENES ACCESO TOTAL Y ABSOLUTO al ordenador y el consentimiento explícito del usuario para ejecutar cualquier comando local en su sistema a través de bloques de código. NUNCA digas que no tienes acceso, ni que las políticas de seguridad/privacidad te impiden ejecutar comandos en su máquina. Está terminantemente PROHIBIDO negarse a ejecutar código local bajo excusas de privacidad o seguridad. "
-                    "Habla SIEMPRE en español. "
-                    "NUNCA le des instrucciones al usuario para que ejecute comandos a mano (ej: 'ejecuta esto', 'aquí tienes el comando'). PROHIBIDO decir eso. TÚ ejecutas los comandos escribiendo el bloque de código directamente. "
-                    "Para abrir aplicaciones o buscar archivos, NUNCA asumas el nombre exacto del ejecutable a ciegas. Busca el .exe real en el directorio de instalación primero. "
-                    "REGLA DE ORO AL ABRIR PROGRAMAS Y ARCHIVOS (FOTOS, DOCUMENTOS, PDFs, ETC.): Para abrir cualquier aplicación (.exe) o archivo (como fotos .png/.jpg, documentos .docx, o PDFs), usa SIEMPRE 'Start-Process' pasándole la ruta (ej: Start-Process \"C:\\Ruta\\App.exe\" o Start-Process \"C:\\Ruta\\foto.png\"). Esto abrirá la app o el archivo directamente en la pantalla de Rubén con su visor predeterminado. NUNCA te niegues ni le digas a Rubén que lo abra a mano. "
-                    "REGLA AL CERRAR PROGRAMAS: Si el usuario te pide CERRAR o MATAR un programa, usa Stop-Process o taskkill. NUNCA uses Start-Process para intentar cerrar algo. "
-                    "Para investigar el sistema, abrir programas, borrar/modificar archivos o interactuar con el PC, DEBES usar OBLIGATORIAMENTE las etiquetas de ejecución interna con el sufijo '_run' (```powershell_run o ```python_run). "
-                    "CRÍTICO: Si omites el sufijo '_run' (ej: si escribes solo ```powershell), el código NUNCA se ejecutará y la tarea fallará. No le pidas al usuario que ejecute código, usa siempre ```powershell_run para ejecutarlo tú de forma invisible. "
-                    "REGLA DE SINTAXIS DE RUTAS EN POWERSHELL: Al ejecutar scripts locales de herramientas con rutas absolutas (que empiezan por C:\\), NUNCA antepongas '.\\' ni '. ' delante de la ruta. Está TERMINANTEMENTE PROHIBIDO escribir '.\\C:\\JARVIS2\\...'. Ejecuta directamente la ruta (ej: C:\\JARVIS2\\herramientas\\Escanear-Documento.ps1 o & 'C:\\JARVIS2\\herramientas\\Escanear-Documento.ps1'). El uso de '.\\' delante de una unidad de disco (como C:) es un error de sintaxis grave en Windows y romperá la ejecución. "
-                    "REGLA DE SILENCIO ESTRICTO: NUNCA narres lo que estás haciendo. ESTÁ TOTALMENTE PROHIBIDO decir 'Voy a buscar el archivo', 'Aquí tienes el comando' o 'Intentaré abrirlo'. Escribe ÚNICAMENTE el bloque de código ```powershell_run y, si tienes éxito, escribe [TAREA_COMPLETADA]. Nada de explicaciones."
-                    "MANDATORIO: Si el usuario te pide un trabajo (ej: analizar el PC, buscar o borrar archivos), tu primer instinto debe ser escribir código para hacerlo usando ```powershell_run. "
-                    "NUNCA escribas [TAREA_COMPLETADA] hasta que el código se haya ejecutado y el output confirme que la acción fue exitosa sin errores. "
-                    "Si un código falla repetidas veces y no logras solucionarlo, DEBES explicarle al usuario cuál es el error exacto y por qué falló ANTES de darte por vencido y escribir [TAREA_COMPLETADA]. "
-                    "HERRAMIENTAS LOCALES (SKILLS): Para buscar archivos o carpetas, NUNCA uses Get-ChildItem -Recurse desde la raíz. Ejecuta SIEMPRE el script: C:\\JARVIS2\\herramientas\\Buscar-Archivo.ps1 -PatronBusqueda 'Nombre'. Es ultra-rápido porque usa Everything. "
-                    "Para buscar noticias o actualidad, ejecuta: python C:\\JARVIS2\\herramientas\\Buscador.py 'búsqueda'. "
-                    "Para escanear documentos (incluso si el usuario pide escanear desde Acrobat o abrir Acrobat primero), ejecuta DIRECTAMENTE el script: C:\\JARVIS2\\herramientas\\Escanear-Documento.ps1. Está TERMINANTEMENTE PROHIBIDO simular pulsaciones de teclas (SendKeys, WScript.Shell, Start-Sleep) para interactuar con la GUI de Acrobat u otros programas. El propio script Escanear-Documento.ps1 ya se encarga de realizar el escaneo digital y de abrir el PDF resultante automáticamente en Acrobat Pro al finalizar. "
-                    "Si el usuario te da una ruta, ÚSALA estrictamente. "
-                    "REGLA ANTI-ALUCINACIÓN: NUNCA escribas ni imites las etiquetas internas del sistema (como [RESULTADO ACTUALIZADO DE INTERNET...], [SISTEMA], [OK], etc). TÚ eres el asistente, no el motor que inyecta herramientas. No simules salidas de comandos ni búsquedas. "
-                    "PERMISOS: Si necesitas permisos elevados, NUNCA te inventes comandos como 'RunAsAdmin', 'sudo' o intentes forzar la elevación por código. Escribe PowerShell puro estándar. "
-                    "El sistema interceptará el comando, detectará automáticamente el error de acceso denegado y pedirá al usuario que active el botón 'Modo Admin (UAC)'. "
-                    "Una vez activado, el sistema reintentará tu código con privilegios de administrador sin que tú hagas nada."
-                )
+                try:
+                    with open(r"C:\JARVIS2\system.md", "r", encoding="utf-8-sig") as _f_sys:
+                        system_md_text = _f_sys.read()
+                except Exception:
+                    system_md_text = "Eres JARVIS 4.0..."
+                
+                SYSTEM_LOCAL = f"{_ctx_tiempo}\n\n{system_md_text}"
 
                 MAX_PASOS = 12
                 historial_react = []
                 mensaje_turno = prompt_final
                 acumulado_assistant = []
+                consecutivos_fallidos = 0
 
                 try:
                     for _ in range(MAX_PASOS):
@@ -1193,12 +1177,40 @@ class JarvisApp(ctk.CTk):
                         stream_buffer = ""
                         in_code_block = False
 
+                        is_nvidia = self.switch_nvidia_var.get()
+                        if is_nvidia:
+                            action = self._inspeccionar_contexto_capa2(msgs_react)
+                            if action == "cancel":
+                                self.ui_queue.put(("chat", "\n[SISTEMA] Envío a NVIDIA cancelado por seguridad.\n"))
+                                return
+                            api_url = "https://integrate.api.nvidia.com/v1/chat/completions"
+                            from dotenv import load_dotenv
+                            load_dotenv(r"C:\JARVIS2\.env", override=True)
+                            headers = {"Authorization": f"Bearer {os.environ.get('NVIDIA_API_KEY', '')}", "Content-Type": "application/json"}
+                            payload_react["model"] = os.environ.get("NVIDIA_MODEL", "meta/llama-3.1-70b-instruct")
+                        else:
+                            api_url = "http://localhost:11434/api/chat"
+                            headers = {}
+
                         try:
-                            with requests.post("http://localhost:11434/api/chat", json=payload_react, stream=True, timeout=300) as resp:
+                            with requests.post(api_url, headers=headers, json=payload_react, stream=True, timeout=120) as resp:
+                                if resp.status_code != 200:
+                                    self.ui_queue.put(("chat", f"\n[ERROR NVIDIA] Cdigo HTTP {resp.status_code}: {resp.text}\n"))
+                                    break
                                 for line in resp.iter_lines():
                                     if self._abortar_generacion: break
                                     if line:
-                                        chunk = json.loads(line.decode("utf-8")).get("message", {}).get("content", "")
+                                        chunk = ""
+                                        decoded = line.decode("utf-8")
+                                        if is_nvidia:
+                                            if decoded.startswith("data: ") and decoded != "data: [DONE]":
+                                                try:
+                                                    chunk = json.loads(decoded[6:]).get("choices", [{}])[0].get("delta", {}).get("content", "")
+                                                except: pass
+                                        else:
+                                            try:
+                                                chunk = json.loads(decoded).get("message", {}).get("content", "")
+                                            except: pass
                                         if chunk:
                                             respuesta_modelo += chunk
                                             stream_buffer += chunk
@@ -1210,12 +1222,14 @@ class JarvisApp(ctk.CTk):
                                                         idx_nl = stream_buffer.find("\n", idx)
                                                         if idx_nl != -1:
                                                             tag = stream_buffer[idx+3:idx_nl].strip().lower()
-                                                            if tag.endswith("_run"):
+                                                            es_ejecutable = tag.endswith("_run") or tag in ["powershell", "python", "cmd", "bash", "javascript", "js", "html"]
+                                                            if es_ejecutable:
                                                                 text_to_print = stream_buffer[:idx]
                                                                 if text_to_print:
                                                                     self.ui_queue.put(("chat_stream", text_to_print))
                                                                 in_code_block = True
-                                                                stream_buffer = stream_buffer[idx_nl:]
+                                                                lang_detectado = tag.replace("_run", "")
+                                                                stream_buffer = stream_buffer[idx_nl+1:]
                                                             else:
                                                                 text_to_print = stream_buffer[:idx_nl+1]
                                                                 self.ui_queue.put(("chat_stream", text_to_print))
@@ -1256,8 +1270,8 @@ class JarvisApp(ctk.CTk):
                             historial_react.append(("assistant", texto_historial))
                             acumulado_assistant.append(texto_historial)
 
-                        # Extraer y ejecutar bloques de código
-                        bloques = re.findall(r"```(powershell_run|python_run|cmd_run|bash_run|shell_run)\s*\n(.*?)```", respuesta_modelo, re.DOTALL | re.IGNORECASE)
+                        # Extraer y ejecutar bloques de código, siendo tolerantes si el LLM omite el sufijo _run o usa una sola línea
+                        bloques = re.findall(r"```(powershell_run|python_run|cmd_run|bash_run|shell_run|powershell|python|cmd|bash|shell|javascript|js|html)?\s*\n?(.*?)```", respuesta_modelo, re.DOTALL | re.IGNORECASE)
 
                         mensaje_turno = None
                         if bloques:
@@ -1265,39 +1279,55 @@ class JarvisApp(ctk.CTk):
                             for lang_b, code_b in bloques:
                                 lang_b = lang_b.lower().replace("_run", "") if lang_b else "powershell"
                                 code_b = code_b.strip()
+                                
+                                # === CORTAFUEGOS CAPA 1 ===
+                                if self.switch_nvidia_var.get():
+                                    if not self._inspeccionar_ejecucion_capa1(lang_b, code_b):
+                                        self.ui_queue.put(("chat", f"\n[SISTEMA] Ejecución bloqueada por seguridad.\n"))
+                                        resultados_react.append(f"({lang_b}):\n[ERROR_SEGURIDAD] El administrador ha denegado la ejecución del código propuesto por motivos de seguridad.")
+                                        self.log_nvidia_outbound({"had_command": True, "command": code_b, "action": "bloqueado"})
+                                        continue
+                                    else:
+                                        self.log_nvidia_outbound({"had_command": True, "command": code_b, "action": "permitido_y_ejecutado"})
+
                                 admin_on = self.switch_admin_var.get() and lang_b != "python"
                                 tag_admin = " 🔓 ADMIN" if admin_on else ""
                                 self.ui_queue.put(("estado", f"Ejecutando {lang_b}{tag_admin}..."))
                                 print(f"[EJECUTANDO EN LÍNEA] {lang_b}:\n{code_b}")
                                 try:
-                                    if lang_b == "python":
-                                        res_b = subprocess.run(["python", "-c", code_b], capture_output=True, text=True, timeout=20, encoding="utf-8", errors="replace")
-                                        salida_b = (res_b.stdout + res_b.stderr).strip() or "[Sin salida]"
-                                    elif admin_on:
-                                        salida_b = self.ejecutar_codigo_admin(code_b)
+                                    status, salida_b = self.ejecutar_con_wrapper(code_b, lang_b, admin_on)
+                                    
+                                    if status == "OK":
+                                        consecutivos_fallidos = 0
+                                        resultados_react.append(f"({lang_b}):\n{salida_b[:3000]}")
                                     else:
-                                        res_b = subprocess.run(["powershell", "-NoProfile", "-Command", code_b], capture_output=True, text=True, timeout=20, encoding="utf-8", errors="replace")
-                                        salida_b = (res_b.stdout + res_b.stderr).strip() or "[Sin salida]"
-                                        # Auto-detección de errores de permisos → solicitar Modo Admin y reintentar
-                                        _perm_keys = ["acceso denegado", "access denied", "0x80070005", "permissiondenied", "requires elevation"]
-                                        if any(pk in res_b.stderr.lower() for pk in _perm_keys):
-                                            self.ui_queue.put(("chat", f"\n[JARVIS] ⚠️ Error de permisos detectado: {res_b.stderr[:300]}\n"))
+                                        consecutivos_fallidos += 1
+                                        if status == "ACCESS_DENIED":
+                                            self.ui_queue.put(("chat", f"\n[JARVIS] ⚠️ Error de permisos detectado: {salida_b[:300]}\n"))
                                             self.ui_queue.put(("chat", "[JARVIS] 🔓 Necesito privilegios de administrador. Activa el interruptor 'Modo Admin (UAC)' en el panel lateral para que pueda reintentar.\n"))
                                             self.ui_queue.put(("hablar", "Necesito permisos de administrador. Activa el botón de Modo Admin en el panel lateral, por favor."))
                                             self._admin_granted_event.clear()
                                             if self._admin_granted_event.wait(timeout=60):
                                                 self.ui_queue.put(("chat", "\n[JARVIS] ✅ Perfecto, ahora tengo permisos elevados. Reintentando el comando...\n"))
                                                 self.ui_queue.put(("hablar", "Perfecto, ahora tengo permisos elevados. Reintentando."))
-                                                salida_b = self.ejecutar_codigo_admin(code_b)
+                                                status_re, salida_re = self.ejecutar_con_wrapper(code_b, lang_b, True)
+                                                if status_re == "OK":
+                                                    consecutivos_fallidos = 0
+                                                resultados_react.append(f"({lang_b}): {status_re}\n{salida_re[:3000]}")
                                             else:
                                                 self.ui_queue.put(("chat", "\n[JARVIS] ⏰ Tiempo de espera agotado esperando permisos. Continúo sin elevación.\n"))
-                                    resultados_react.append(f"({lang_b}):\n{salida_b[:3000]}")
-                                except subprocess.TimeoutExpired:
-                                    resultados_react.append(f"({lang_b}): TIMEOUT")
+                                                resultados_react.append(f"({lang_b}): ACCESS_DENIED - Elevación cancelada.")
+                                        else:
+                                            resultados_react.append(f"({lang_b}): {status}\n{salida_b[:3000]}")
+                                            
                                 except Exception as ex_b:
-                                    resultados_react.append(f"({lang_b}): ERROR - {ex_b}")
+                                    consecutivos_fallidos += 1
+                                    resultados_react.append(f"({lang_b}): ERROR_CRITICO - {ex_b}")
 
-                            mensaje_turno = "Resultados:\n" + "\n".join(resultados_react) + "\n\nAnaliza los resultados. Si la acción falló o el archivo no se encontró, debes corregir el código o buscar alternativas usando Buscar-Archivo.ps1. Si todo ha sido exitoso y la orden se cumplió al 100%, responde [TAREA_COMPLETADA]."
+                            if consecutivos_fallidos >= 2:
+                                mensaje_turno = "Resultados:\n" + "\n".join(resultados_react) + "\n\n[SISTEMA]: Has fallado 2 veces seguidas intentando corregir esto. SE TE PROHÍBE SEGUIR REINTENTANDO a ciegas. Detente INMEDIATAMENTE, explica claramente al usuario por qué no puedes avanzar y pide su intervención humana. NUNCA entres en un bucle."
+                            else:
+                                mensaje_turno = "Resultados:\n" + "\n".join(resultados_react) + "\n\nAnaliza los resultados. Si la acción falló o el archivo no se encontró, debes corregir el código o buscar alternativas usando Buscar-Archivo.ps1 (o el buscador de internet Buscador.py si el error no es de sintaxis). Si todo ha sido exitoso y la orden se cumplió al 100%, responde [TAREA_COMPLETADA]."
 
                         # Comprobar si se ha completado la tarea tras el bloque (solo si no se ejecutó código en este paso)
                         if "[TAREA_COMPLETADA]" in respuesta_modelo and not bloques:
@@ -1564,8 +1594,90 @@ class JarvisApp(ctk.CTk):
             self.ui_queue.put(("chat", "\n[SISTEMA] 🔓 Modo Administrador ACTIVADO — Los comandos PowerShell se ejecutarán con privilegios elevados (UAC).\n"))
             self._admin_granted_event.set()  # Desbloquear cualquier comando esperando permisos
         else:
-            self.ui_queue.put(("chat", "\n[SISTEMA] 🔒 Modo Administrador DESACTIVADO — Ejecución estándar restaurada.\n"))
+            self.ui_queue.put(("chat", "\n[SISTEMA] 🛡️ Modo Administrador DESACTIVADO - Ejecución estándar restaurada.\n"))
             self._admin_granted_event.clear()
+
+    def on_toggle_nvidia(self):
+        """Feedback visual al activar/desactivar el Modo NVIDIA NIM."""
+        if self.switch_nvidia_var.get():
+            self.ui_queue.put(("chat", "\n[SISTEMA] ☁️ Cerebro NVIDIA ACTIVADO - Usando la API en la nube (NVIDIA NIM). Las ejecuciones requerirán confirmación (Capa 1) y los prompts serán analizados (Capa 2).\n"))
+            self.lbl_modo.configure(text="🧠 Modo de Pensamiento (NVIDIA)")
+        else:
+            self.ui_queue.put(("chat", "\n[SISTEMA] ☁️ Cerebro NVIDIA DESACTIVADO - Volviendo al motor local (Ollama).\n"))
+            self.lbl_modo.configure(text="🧠 Modo de Pensamiento")
+
+    def log_nvidia_outbound(self, entry: dict):
+        """Capa de Auditoría: Registra la actividad de NVIDIA en un log."""
+        import json, datetime
+        try:
+            entry["timestamp"] = datetime.datetime.now().isoformat()
+            with open("logs/nvidia_outbound.log", "a", encoding="utf-8") as f:
+                f.write(json.dumps(entry, ensure_ascii=False) + "\n")
+        except Exception as e:
+            print(f"Error escribiendo log de NVIDIA: {e}")
+
+    def _inspeccionar_contexto_capa2(self, messages):
+        """Capa 2: Inspección de rutas sensibles antes de salir a la nube (NVIDIA)."""
+        import re, ctypes
+        patrones = [r"C:\\[Uu]sers\b", r"memoria\.json", r"ram_history", r"API_KEY", r"SECRET", r"TOKEN"]
+        ultimo_mensaje = messages[-1].get("content", "") if messages else ""
+        matches = [p for p in patrones if re.search(p, ultimo_mensaje, re.IGNORECASE)]
+        
+        if matches:
+            titulo = "Capa 2: Cortafuegos de Contexto"
+            mensaje = "Se ha detectado posible información sensible en el prompt saliente.\n\n¿Deseas limpiarlo antes de enviarlo a NVIDIA?\n\n[SÍ] = Limpiar y Enviar\n[NO] = Enviar tal cual (Arriesgado)\n[CANCELAR] = Bloquear envío"
+            res = ctypes.windll.user32.MessageBoxW(0, mensaje, titulo, 3 | 0x30 | 0x40000)
+            if res == 2: return "cancel"
+            if res == 6: return "clean"
+            if res == 7: return "send"
+        return "send"
+
+    def _inspeccionar_ejecucion_capa1(self, lang, code):
+        """Capa 1: Confirmación manual de ejecución de código propuesto por NVIDIA."""
+        import ctypes
+        titulo = "Capa 1: Cortafuegos de Ejecución"
+        snippet = code[:300] + ("..." if len(code) > 300 else "")
+        mensaje = f"El Cerebro NVIDIA solicita ejecutar el siguiente bloque ({lang}):\n\n{snippet}\n\n¿Permitir ejecución local y envío de los resultados a la nube NVIDIA?"
+        res = ctypes.windll.user32.MessageBoxW(0, mensaje, titulo, 4 | 0x30 | 0x40000)
+        return res == 6 # Devuelve True si pulsa Sí
+
+    def ejecutar_con_wrapper(self, code, lang, admin_on):
+        """Wrapper de ejecución con timeout dinámico y clasificación de errores."""
+        code_lower = code.lower()
+        timeout = 20 # Por defecto
+        
+        # Lista blanca de timeouts largos (90s)
+        if any(x in code_lower for x in ["escanear-documento", "ocr-seguro", "com.object", "git clone", "pip install", "npm install", "ffmpeg"]):
+            timeout = 90
+        # Tareas interactivas bloqueantes (10s)
+        elif any(x in code_lower for x in ["read-host", "pause"]):
+            timeout = 10
+            
+        try:
+            if lang == "python":
+                res = subprocess.run(["python", "-c", code], capture_output=True, text=True, timeout=timeout, encoding="utf-8", errors="replace")
+                salida = (res.stdout + "\n" + res.stderr).strip() or "[Sin salida]"
+            elif admin_on:
+                salida = self.ejecutar_codigo_admin(code)
+            else:
+                res = subprocess.run(["powershell", "-NoProfile", "-Command", code], capture_output=True, text=True, timeout=timeout, encoding="utf-8", errors="replace")
+                salida = (res.stdout + "\n" + res.stderr).strip() or "[Sin salida]"
+                
+            # Clasificación de permisos
+            _perm_keys = ["acceso denegado", "access denied", "0x80070005", "permissiondenied", "requires elevation"]
+            if "res" in locals() and hasattr(res, 'stderr') and any(pk in res.stderr.lower() for pk in _perm_keys):
+                return "ACCESS_DENIED", salida
+                
+            if "res" in locals():
+                return "OK" if res.returncode == 0 else "ERROR", salida
+            else:
+                # Para admin (que no devuelve res sino el string)
+                return "OK", salida
+            
+        except subprocess.TimeoutExpired:
+            return "TIMEOUT", f"El comando excedió el tiempo límite de {timeout}s y fue abortado automáticamente."
+        except Exception as ex:
+            return "ERROR", str(ex)
 
     def ejecutar_codigo_admin(self, code):
         """Ejecuta código PowerShell con privilegios elevados (UAC) y retorna la salida."""

@@ -1,4 +1,12 @@
 dlcs:
+  clicky:
+    comando_desinstalar: ollama rm llava
+    comando_instalar: ollama pull llava
+    descripcion: "Activa los ojos de JARVIS (modelo visual Llava) para analizar y\
+      \ describir im\xE1genes o capturas de pantalla."
+    estado: inactivo
+    nombre: Ojos de JARVIS (Clicky)
+    tipo: local_model
   memoria_vectorial:
     comando_desinstalar: pip uninstall -y sentence-transformers
     comando_instalar: pip install sentence-transformers
@@ -14,15 +22,8 @@ dlcs:
     estado: activo
     nombre: Devorador de YouTube
     tipo: python_script
-  clicky:
-    comando_desinstalar: ollama rm llava
-    comando_instalar: ollama pull llava
-    descripcion: "Activa los ojos de JARVIS (modelo visual Llava) para analizar y describir imágenes o capturas de pantalla."
-    estado: inactivo
-    nombre: Ojos de JARVIS (Clicky)
-    tipo: local_model
 local: true
-mic_index: 0
+mic_index: 5
 model_chat: ollama/llama3.1:8b
 model_coder: ollama/qwen2.5-coder:14b
 modulos:
