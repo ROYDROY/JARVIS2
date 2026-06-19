@@ -1277,6 +1277,15 @@ class JarvisApp(ctk.CTk):
 
                         # Extraer y ejecutar bloques de código, siendo tolerantes si el LLM omite el sufijo _run o usa una sola línea
                         bloques = re.findall(r"```(powershell_run|python_run|cmd_run|bash_run|shell_run|powershell|python|cmd|bash|shell|javascript|js|html)?\s*\n?(.*?)```", respuesta_modelo, re.DOTALL | re.IGNORECASE)
+                        
+                        if not bloques:
+                            # Buscar si hay un bloque de código sin cerrar al final por cortes en la generación
+                            match_unclosed = re.search(r"```(powershell_run|python_run|cmd_run|bash_run|shell_run|powershell|python|cmd|bash|shell|javascript|js|html)?\s*\n?(.*?)$", respuesta_modelo, re.DOTALL | re.IGNORECASE)
+                            if match_unclosed:
+                                lang_b = match_unclosed.group(1) or "powershell"
+                                code_b = match_unclosed.group(2).strip()
+                                if code_b:
+                                    bloques = [(lang_b, code_b)]
 
                         mensaje_turno = None
                         if bloques:
