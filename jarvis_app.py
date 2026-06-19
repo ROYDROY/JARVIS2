@@ -71,9 +71,15 @@ try:
         config_data = yaml.safe_load(f) or {}
         MODEL_CODER = config_data.get("model_coder", "ollama/qwen2.5-coder:14b")
         MODEL_CHAT = config_data.get("model_chat", "ollama/llama3.1:8b")
+        TEMP_CODER = float(config_data.get("temperature_coder", 0.1))
+        TEMP_CHAT = float(config_data.get("temperature_chat", 0.7))
+        ES_MULTIPLE = config_data.get("es_multiple_resultado", "auto_exe")
 except Exception:
     MODEL_CODER = "ollama/qwen2.5-coder:14b"
     MODEL_CHAT = "ollama/llama3.1:8b"
+    TEMP_CODER = 0.1
+    TEMP_CHAT = 0.7
+    ES_MULTIPLE = "auto_exe"
 
 def seleccionar_cerebro(prompt, modo="Automático"):
     prompt_lower = prompt.lower()
@@ -1071,6 +1077,7 @@ class JarvisApp(ctk.CTk):
                     payload_ft = {
                         "model": modelo_chat_local,
                         "messages": msgs_ft,
+                        "options": {"temperature": TEMP_CHAT},
                         "stream": True
                     }
                     response_text = ""
@@ -1201,6 +1208,12 @@ class JarvisApp(ctk.CTk):
                         else:
                             api_url = "http://localhost:11434/api/chat"
                             headers = {}
+                            
+                            # Pasar temperatura a Ollama en ReAct
+                            modelo_coder_local = MODEL_CODER.replace("ollama/", "").lower()
+                            modelo_chat_local = MODEL_CHAT.replace("ollama/", "").lower()
+                            temp_to_use = TEMP_CHAT if modelo_local.lower() == modelo_chat_local else TEMP_CODER
+                            payload_react["options"] = {"temperature": temp_to_use}
 
                         try:
                             # LOG TEMPORAL SOLICITADO
@@ -1814,30 +1827,44 @@ if ($ya_abierto -and $ya_abierto.MainWindowHandle -ne 0) {{
                             code_lower = code.lower()
                             
                         elif len(valid_results) > 1:
-                            # Más de 1 resultado -> mostrar lista numerada
-                            print(f"[WRAPPER] Varios resultados encontrados. Mostrando popup de elección.")
-                            choice_event = threading.Event()
-                            choice_result = [None]
-                            
-                            def set_choice(val):
-                                choice_result[0] = val
-                                choice_event.set()
-                                
-                            self.ui_queue.put(("popup_eleccion", (nombre_normalizado, valid_results, set_choice)))
-                            
-                            # Esperar a que el usuario elija
-                            choice_event.wait()
-                            selected_path = choice_result[0]
-                            
-                            if selected_path:
-                                print(f"[WRAPPER] El usuario seleccionó: '{selected_path}'. Registrando y abriendo.")
+                            if ES_MULTIPLE == "auto_exe":
+                                # Filtrar solo líneas que terminen en .exe (ignorar .lnk, etc.)
+                                resultados_exe = [r for r in valid_results if r.strip().lower().endswith(".exe")]
+                                if resultados_exe:
+                                    selected_path = resultados_exe[0]  # Tomar el primero
+                                else:
+                                    selected_path = valid_results[0]  # Si no hay .exe, tomar el primero igualmente
+                                    
+                                print(f"[WRAPPER] Auto-seleccionado por auto_exe: '{selected_path}'. Registrando y abriendo.")
                                 self.registrar_app_en_indice(nombre_normalizado, selected_path)
                                 self.procesos_activos[nombre_normalizado.lower()] = True
                                 code = f'Start-Process "{selected_path}"'
                                 code_lower = code.lower()
                             else:
-                                # Cancelado o cerrado
-                                return "OK", f"Búsqueda de {nombre_normalizado} cancelada por el usuario."
+                                # Comportamiento original con popup
+                                print(f"[WRAPPER] Varios resultados encontrados. Mostrando popup de elección.")
+                                choice_event = threading.Event()
+                                choice_result = [None]
+                                
+                                def set_choice(val):
+                                    choice_result[0] = val
+                                    choice_event.set()
+                                    
+                                self.ui_queue.put(("popup_eleccion", (nombre_normalizado, valid_results, set_choice)))
+                                
+                                # Esperar a que el usuario elija
+                                choice_event.wait()
+                                selected_path = choice_result[0]
+                                
+                                if selected_path:
+                                    print(f"[WRAPPER] El usuario seleccionó: '{selected_path}'. Registrando y abriendo.")
+                                    self.registrar_app_en_indice(nombre_normalizado, selected_path)
+                                    self.procesos_activos[nombre_normalizado.lower()] = True
+                                    code = f'Start-Process "{selected_path}"'
+                                    code_lower = code.lower()
+                                else:
+                                    # Cancelado o cerrado
+                                    return "OK", f"Búsqueda de {nombre_normalizado} cancelada por el usuario."
                                 
                         else:
                             # 0 resultados -> mostrar mensaje y parar
