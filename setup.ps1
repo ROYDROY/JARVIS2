@@ -271,6 +271,20 @@ if (-not (Test-Path $indicePath)) {
                 close_title = "Spotify"
             }
         }
+        apps_custom = @{
+            autofirma = @{
+                open = "C:\Program Files\Autofirma\Autofirma\Autofirma.exe"
+                close_title = "Autofirma"
+            }
+            x = @{ nombres = @("x", "twitter"); lnk = $true }
+            discord = @{ nombres = @("discord"); lnk = $true }
+            instagram = @{ nombres = @("instagram", "insta"); lnk = $true }
+            tiktok = @{ nombres = @("tiktok", "tik tok"); lnk = $true }
+            linkedin = @{ nombres = @("linkedin"); lnk = $true }
+            substack = @{ nombres = @("substack"); lnk = $true }
+            facebook = @{ nombres = @("facebook", "fb"); lnk = $true }
+            telegram = @{ nombres = @("telegram"); lnk = $true }
+        }
     }
     $indiceDefault | ConvertTo-Json -Depth 5 | Set-Content -Path $indicePath -Encoding UTF8
     Write-Host "    Creado indice.json con valores por defecto." -ForegroundColor Green
