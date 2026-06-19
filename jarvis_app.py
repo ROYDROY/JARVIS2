@@ -969,7 +969,8 @@ class JarvisApp(ctk.CTk):
         try:
             es_path = os.path.join(BASE_DIR, "herramientas", "es.exe")
             res = subprocess.run([es_path, nombre + ".exe"], capture_output=True, text=True, timeout=5)
-            lineas = [l.strip() for l in res.stdout.strip().splitlines() if l.strip().lower().endswith(".exe")]
+            # Exigir coincidencia exacta del nombre de archivo para evitar silencio falso con búsquedas parciales
+            lineas = [l.strip() for l in res.stdout.strip().splitlines() if l.strip().lower().endswith(f"\\{nombre_lower}.exe")]
             if lineas:
                 ruta = lineas[0]
                 subprocess.Popen([ruta])
@@ -981,21 +982,46 @@ class JarvisApp(ctk.CTk):
 
     def _registrar_y_retornar_apertura(self, nombre, default_proc):
         """Intenta capturar el nombre real del proceso en ejecución y lo registra en procesos_activos."""
-        import time, subprocess
-        time.sleep(1.5)  # Dar tiempo a que arranque
+        import time, subprocess, os
+        time.sleep(2.0)  # Dar tiempo a que arranque
+        
+        nombre_lower = nombre.lower()
+        proceso_real = None
+        
         try:
+            # Buscar por nombre o MainWindowTitle que contenga la app
             res = subprocess.run(
                 ["powershell", "-NoProfile", "-Command",
-                 f"Get-Process | Where-Object {{$_.Name -like '*{nombre}*'}} | Select-Object -First 1 -ExpandProperty Name"],
+                 f"Get-Process | Where-Object {{$_.Name -like '*{nombre}*' -or $_.MainWindowTitle -like '*{nombre}*'}} | Select-Object -First 1 -ExpandProperty Name"],
                 capture_output=True, text=True, timeout=5
             )
             proceso_real = res.stdout.strip()
-            if proceso_real:
-                self.procesos_activos[nombre.lower()] = proceso_real + ".exe"
-            else:
-                self.procesos_activos[nombre.lower()] = default_proc
         except Exception:
-            self.procesos_activos[nombre.lower()] = default_proc
+            pass
+            
+        if proceso_real:
+            self.procesos_activos[nombre_lower] = proceso_real + ".exe"
+        else:
+            self.procesos_activos[nombre_lower] = default_proc
+            
+        # Verificar si realmente está corriendo algún proceso de la app para evitar silencio falso
+        try:
+            proc_check = os.path.basename(self.procesos_activos[nombre_lower]).replace(".exe", "")
+            if "shell:" in proc_check.lower():
+                proc_check = nombre
+                
+            res_check = subprocess.run(
+                ["powershell", "-NoProfile", "-Command",
+                 f"Get-Process | Where-Object {{$_.Name -like '*{proc_check}*' -or $_.MainWindowTitle -like '*{proc_check}*'}} | Measure-Object | Select-Object -ExpandProperty Count"],
+                capture_output=True, text=True, timeout=5
+            )
+            count = res_check.stdout.strip()
+            if count == "0" or not count:
+                # Si es 0, remover de procesos_activos y retornar mensaje de error
+                self.procesos_activos.pop(nombre_lower, None)
+                return f"No he podido abrir {nombre}. Verifica que esté instalada."
+        except Exception:
+            pass
             
         return f"{nombre.capitalize()} abierta."
 
@@ -1046,7 +1072,8 @@ class JarvisApp(ctk.CTk):
             try:
                 es_path = os.path.join(BASE_DIR, "herramientas", "es.exe")
                 res = subprocess.run([es_path, nombre + ".exe"], capture_output=True, text=True, timeout=5)
-                lineas = [l.strip() for l in res.stdout.strip().splitlines() if l.strip().lower().endswith(".exe")]
+                # Exigir coincidencia exacta del nombre de archivo para evitar silencio falso con búsquedas parciales
+                lineas = [l.strip() for l in res.stdout.strip().splitlines() if l.strip().lower().endswith(f"\\{nombre_lower}.exe")]
                 if lineas:
                     proceso = os.path.basename(lineas[0])
             except Exception:
