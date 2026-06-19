@@ -1,22 +1,31 @@
 {
   "apps_uwp": {
     "whatsapp": {
+      "nombres": ["whatsapp", "wsp", "whats"],
       "open": "shell:AppsFolder\\5319275A.WhatsAppDesktop_cv1g1gvanyjgm!App",
       "close_cmd": "Get-Process | Where-Object {$_.Name -like '*WhatsApp*'} | Stop-Process -Force"
     },
     "whatsappdesktop": {
+      "nombres": ["whatsapp desktop", "whatsappdesktop"],
       "open": "shell:AppsFolder\\5319275A.WhatsAppDesktop_cv1g1gvanyjgm!App",
       "close_cmd": "Get-Process | Where-Object {$_.Name -like '*WhatsApp*'} | Stop-Process -Force"
     },
     "spotify": {
+      "nombres": ["spotify", "music", "musica"],
       "open": "shell:AppsFolder\\SpotifyAB.SpotifyMusic_zpdnekdrzrea0!Spotify",
       "close_title": "Spotify"
     }
   },
   "apps_custom": {
     "autofirma": {
+      "nombres": ["autofirma", "firma", "auto firma"],
       "open": "C:\\Program Files\\Autofirma\\Autofirma\\Autofirma.exe",
-      "close_title": "Autofirma"
+      "close_title": "AutoFirma"
+    },
+    "yi_iot": {
+      "nombres": ["yi iot", "yi", "yiiot", "camara yi", "camara"],
+      "open": "",
+      "close_title": "YI IoT"
     }
   }
 }
