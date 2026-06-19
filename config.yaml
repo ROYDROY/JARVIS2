@@ -26,6 +26,10 @@ local: true
 mic_index: 5
 model_chat: ollama/llama3.1:8b
 model_coder: ollama/qwen2.5-coder:14b
+temperature_coder: 0.1
+temperature_chat: 0.7
+es_multiple_resultado: auto_exe
+popup_seleccion_multiples: false
 modulos:
   indice:
     estado: activo
