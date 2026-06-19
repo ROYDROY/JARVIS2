@@ -26,10 +26,10 @@ El proyecto vive en `C:\JARVIS2\`. Sus componentes clave son:
 * `.env`: Cortafuegos de credenciales. Almacena las APIs externas. **NUNCA** incrustar estas claves en el código fuente ni subirlas a repositorios. *(Nota: Ahora puede gestionarse cómodamente y de forma dinámica desde la sección "Cerebros y APIs" de la propia interfaz gráfica).*
   * *Nota para el Admin:* Si el `.env` se pierde en un formateo, puedes volver a llenarlo usando la interfaz.
   * *¿De dónde saco la API de Gemini?* Se genera gratis en [Google AI Studio](https://aistudio.google.com/app/apikey). Es el "motor" del Cirujano Especialista.
-* `system.md`: **El Cerebro y las Reglas.** Contiene el System Prompt maestro. Dicta la personalidad, restricciones anti-alucinaciones y el uso del buscador autónomo.
+* `system.md`: **El Cerebro y las Reglas.** Contiene el System Prompt maestro. Dicta la personalidad, restricciones anti-alucinaciones, las reglas de UWP y el uso del buscador autónomo.
+* `indice.json`: El mapa de aplicaciones conocidas. Mapea nombres de aplicaciones locales a comandos UWP seguros para apertura y cierre deterministas de instancia única (ej. `WhatsApp.Root`).
 * `\memoria\`:
   * `memoria.json`: El historial de "Hechos, Decisiones y Temas". Se inyecta como contexto al inicio de cada sesión para que JARVIS "recuerde" quién es el usuario y qué hizo antes.
-  * `indice.json`: El mapa de la "Capa Caliente". Sabe qué discos, carpetas y aplicaciones existen para que el LLM no ande a ciegas.
 * `\modulos\`: Archivos `.psm1` cargados al arranque mediante la arquitectura modular definida en `config.yaml`.
 * `\herramientas\`: Scripts vitales, inmutables y ultra-optimizados (ver sección de Skills).
 * `\sandbox\`: Entorno seguro donde el LLM genera archivos de trabajo.
@@ -55,6 +55,7 @@ Cuando Jarvis utiliza el cerebro de Gemini 1.5 Pro, tiene habilitado el **OS Mod
 2. **Botón del Pánico (ESC):** Durante la ejecución autónoma, si el usuario pulsa la tecla `ESC`, Jarvis lanzará el ratón a la esquina de la pantalla (coordenadas 0,0) activando un `FailSafeException` y abortando la ejecución de la IA instantáneamente.
 3. **Anuncio de Arranque:** Si existe un archivo `rutinas.json` en `C:\JARVIS2\config\`, Jarvis anunciará por voz las tareas programadas al arrancar el programa.
 4. **Modo Administrador (UAC):** Un interruptor en la interfaz gráfica (`🔓 Modo Admin`) permite elevar privilegios. Si Jarvis se encuentra con un error de `Acceso denegado`, solicitará por voz y chat que se active este botón. Una vez activo, Jarvis relanzará automáticamente el comando desencadenando el popup nativo UAC de Windows, garantizando que el usuario SIEMPRE tiene la última palabra antes de tocar el sistema a bajo nivel.
+5. **Corte Duro Anti-Bucle (Failsafe ReAct):** En el ciclo ReAct local (Ollama/NIM), si el wrapper de Python detecta que se han producido 2 fallos de ejecución consecutivos (ej. error de sintaxis repetido o ruta inexistente), se aborta la ejecución inmediatamente por código de Python mediante un `break` forzado. Esto previene bucles de razonamiento infinitos y consumo de API.
 
 ---
 
@@ -80,6 +81,7 @@ Las herramientas principales son:
 2. `Buscar-Archivo.ps1`: Capa de búsqueda de archivos locales. Nunca uses `Get-ChildItem -Recurse` desde la raíz. Utiliza `es.exe` de Everything CLI y ha sido mejorado para soportar búsquedas de palabras clave independientes (operador lógico AND), permitiendo buscar frases en cualquier orden (ej. 'control compras' encuentra 'Control de compras').
 3. `MotorVoz.py` / `NervioOptico.py`: Módulos periféricos de escucha pasiva, síntesis de voz y procesamiento de visión artificial.
 4. `Escanear-Documento.ps1`: Capa de escaneo de documentos multipágina interactivo. Digitaliza la primera página de forma desatendida y directa. Cuenta con forzado de Flatbed (cama plana, propiedad `3088` y `3012`) tanto en el hardware como en cada ítem secundario de WIA, evitando la excepción `0x80210015` de alimentador vacío en escáneres Epson. Pregunta de forma interactiva si se desean escanear más páginas, compila el PDF resultante (utilizando Pillow) y lo abre en Acrobat Pro.
+5. `indice.json` (Mapeo UWP): Sistema de mapeo e interceptación automática en el wrapper. Si la IA intenta buscar o cerrar un programa mapeado (como WhatsApp o Spotify), el wrapper de Python intercepta el comando PowerShell en caliente. Reemplaza la búsqueda de `es.exe` por `Start-Process shell:AppsFolder\...` (controlando si la instancia ya está abierta para enfocarla) o reemplaza `Stop-Process` por un comando específico (`close_cmd`) o un mensaje de ventana seguro (`WM_CLOSE` / `PostMessage`).
 
 **Para añadir una nueva Skill:**
 1. Escribe un script (Python o PowerShell) y guárdalo en `\herramientas\`.

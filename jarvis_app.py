@@ -112,7 +112,8 @@ def seleccionar_cerebro(prompt, modo="Automático"):
                                    "powershell", "python", "automatiza", "archivo", "carpeta",
                                    "ejecut", "comando", "json", "terminal", "consola", "instala", 
                                    "descarga", "arranca", "abr", "inicia", "cierr", "apaga", "reinicia",
-                                   "borr", "elimin", "quit", "suprim", "destruy", "carg", "mat"]
+                                   "borr", "elimin", "quit", "suprim", "destruy", "carg", "mat",
+                                   "busca", "encuentra", "es.exe", "exe", "whatsapp"]
                 if any(k in prompt_lower for k in keywords_codigo):
                     es_codigo = True
                 else:
@@ -1137,13 +1138,7 @@ class JarvisApp(ctk.CTk):
                 _ahora = datetime.now()
                 _ctx_tiempo = f"CONTEXTO TEMPORAL: Hoy es {_dias_es[_ahora.weekday()]} {_ahora.strftime('%d/%m/%Y')} y son las {_ahora.strftime('%H:%M')}. Usa esta información para contextualizar tus respuestas (saludos, referencias al día, etc.)."
 
-                try:
-                    with open(r"C:\JARVIS2\system.md", "r", encoding="utf-8-sig") as _f_sys:
-                        system_md_text = _f_sys.read()
-                except Exception:
-                    system_md_text = "Eres JARVIS 4.0..."
-                
-                SYSTEM_LOCAL = f"{_ctx_tiempo}\n\n{system_md_text}"
+                SYSTEM_LOCAL = f"{_ctx_tiempo}\n\n{interpreter.system_message}"
 
                 MAX_PASOS = 12
                 historial_react = []
@@ -1157,18 +1152,19 @@ class JarvisApp(ctk.CTk):
                             self.ui_queue.put(("chat", "\n[JARVIS]: Proceso abortado.\n"))
                             break
                         msgs_react = []
-                        # 1. Añadir historial global previo filtrado (evitar bloqueos con llamadas a funciones de la nube)
+                        # 1. Inyectar el SYSTEM_LOCAL al PRINCIPIO para que la API no lo ignore (vital para Ollama/Llama-3)
+                        msgs_react.append({"role": "system", "content": SYSTEM_LOCAL})
+                        
+                        # 2. Añadir historial global previo filtrado (evitar bloqueos con llamadas a funciones de la nube)
                         for m in interpreter.messages[-10:]:
                             if isinstance(m, dict):
                                 r = m.get("role", "user")
                                 c = m.get("content")
                                 if isinstance(c, str) and c.strip():
                                     msgs_react.append({"role": r, "content": c})
-                        # 2. Añadir los pasos de razonamiento de este turno
+                        # 3. Añadir los pasos de razonamiento de este turno
                         for role_h, cont_h in historial_react:
                             msgs_react.append({"role": role_h, "content": cont_h})
-                        # 3. Inyectar el SYSTEM_LOCAL al final para que el modelo local lo tenga fresco en contexto
-                        msgs_react.append({"role": "system", "content": SYSTEM_LOCAL})
                         # 4. Añadir el mensaje de usuario actual
                         msgs_react.append({"role": "user", "content": mensaje_turno})
 
@@ -1193,6 +1189,10 @@ class JarvisApp(ctk.CTk):
                             headers = {}
 
                         try:
+                            # LOG TEMPORAL SOLICITADO
+                            sys_msg_val = interpreter.system_message if hasattr(interpreter, "system_message") else "NONE"
+                            print(f"[DEBUG] System Prompt (primeros 200 chars): {str(sys_msg_val)[:200]}")
+                            
                             with requests.post(api_url, headers=headers, json=payload_react, stream=True, timeout=120) as resp:
                                 if resp.status_code != 200:
                                     self.ui_queue.put(("chat", f"\n[ERROR NVIDIA] Cdigo HTTP {resp.status_code}: {resp.text}\n"))
@@ -1325,7 +1325,14 @@ class JarvisApp(ctk.CTk):
                                     resultados_react.append(f"({lang_b}): ERROR_CRITICO - {ex_b}")
 
                             if consecutivos_fallidos >= 2:
-                                mensaje_turno = "Resultados:\n" + "\n".join(resultados_react) + "\n\n[SISTEMA]: Has fallado 2 veces seguidas intentando corregir esto. SE TE PROHÍBE SEGUIR REINTENTANDO a ciegas. Detente INMEDIATAMENTE, explica claramente al usuario por qué no puedes avanzar y pide su intervención humana. NUNCA entres en un bucle."
+                                self.ui_queue.put(("chat", "\n[SISTEMA] 🛑 Bucle detectado (2 fallos consecutivos). Abortando ejecución automáticamente.\n"))
+                                self.ui_queue.put(("chat", "\n─────────────────────────────────\n"))
+                                self.ui_queue.put(("hablar", "He fallado dos veces seguidas. Detengo la ejecución por seguridad."))
+                                interpreter.messages.append({"role": "user", "content": prompt})
+                                response_final_str = "\n".join(acumulado_assistant) if acumulado_assistant else "Error: Bucle detectado y abortado."
+                                interpreter.messages.append({"role": "assistant", "content": response_final_str})
+                                self.ui_queue.put(("chat_final", response_final_str))
+                                break
                             else:
                                 mensaje_turno = "Resultados:\n" + "\n".join(resultados_react) + "\n\nAnaliza los resultados. Si la acción falló o el archivo no se encontró, debes corregir el código o buscar alternativas usando Buscar-Archivo.ps1 (o el buscador de internet Buscador.py si el error no es de sintaxis). Si todo ha sido exitoso y la orden se cumplió al 100%, responde [TAREA_COMPLETADA]."
 
@@ -1644,6 +1651,86 @@ class JarvisApp(ctk.CTk):
     def ejecutar_con_wrapper(self, code, lang, admin_on):
         """Wrapper de ejecución con timeout dinámico y clasificación de errores."""
         code_lower = code.lower()
+        
+        # Interceptador de aplicaciones conocidas en indice.json para evitar la búsqueda lenta o fallida
+        if lang != "python" and "es.exe" in code_lower:
+            try:
+                indice_path = r"C:\JARVIS2\indice.json"
+                if os.path.exists(indice_path):
+                    with open(indice_path, "r", encoding="utf-8") as f_ind:
+                        apps_conocidas = json.load(f_ind)
+                    for app_key, data in apps_conocidas.get("apps_uwp", {}).items():
+                        if app_key in code_lower:
+                            uwp_path = data.get("open")
+                            close_title = data.get("close_title")
+                            if uwp_path:
+                                if close_title:
+                                    code = f'''
+$ya_abierto = Get-Process | Where-Object {{$_.MainWindowTitle -like "*{close_title}*"}} | Select-Object -First 1
+if ($ya_abierto -and $ya_abierto.MainWindowHandle -ne 0) {{
+    Add-Type @"
+    using System;
+    using System.Runtime.InteropServices;
+    public class WinFocus {{
+        [DllImport("user32.dll")]
+        public static extern bool SetForegroundWindow(IntPtr hWnd);
+    }}
+"@
+    [WinFocus]::SetForegroundWindow($ya_abierto.MainWindowHandle)
+    Write-Output "{app_key} ya estaba abierto. Traído al frente."
+}} else {{
+    Start-Process "{uwp_path}"
+    Write-Output "{app_key} lanzado correctamente."
+}}
+'''
+                                else:
+                                    code = f'Start-Process "{uwp_path}"'
+                                code_lower = code.lower()
+                                print(f"[WRAPPER] Interceptado {app_key}. Redirigiendo búsqueda es.exe a lanzamiento directo con control de foco.")
+                                break
+            except Exception as e_ind:
+                print(f"[WRAPPER ERROR] No se pudo procesar indice.json para abrir: {e_ind}")
+
+        # Interceptador de cierre de aplicaciones UWP en indice.json para evitar errores de Stop-Process
+        if lang != "python" and ("stop-process" in code_lower or "stopprocess" in code_lower):
+            try:
+                indice_path = r"C:\JARVIS2\indice.json"
+                if os.path.exists(indice_path):
+                    with open(indice_path, "r", encoding="utf-8") as f_ind:
+                        apps_conocidas = json.load(f_ind)
+                    for app_key, data in apps_conocidas.get("apps_uwp", {}).items():
+                        if app_key in code_lower:
+                            close_cmd = data.get("close_cmd")
+                            close_title = data.get("close_title")
+                            if close_cmd:
+                                code = close_cmd
+                                code_lower = code.lower()
+                                print(f"[WRAPPER] Interceptado cierre de {app_key}. Redirigiendo a comando de cierre personalizado: {code}")
+                                break
+                            elif close_title:
+                                code = f'''
+Add-Type @"
+using System;
+using System.Runtime.InteropServices;
+public class WinAPI {{
+    [DllImport("user32.dll")]
+    public static extern bool PostMessage(IntPtr hWnd, uint Msg, IntPtr wParam, IntPtr lParam);
+}}
+"@
+$proc = Get-Process | Where-Object {{$_.MainWindowTitle -like "*{close_title}*"}} | Select-Object -First 1
+if ($proc -and $proc.MainWindowHandle -ne 0) {{
+    [WinAPI]::PostMessage($proc.MainWindowHandle, 0x0010, [IntPtr]::Zero, [IntPtr]::Zero)
+    Write-Output "{app_key} cerrado correctamente."
+}} else {{
+    Write-Output "La aplicación no está abierta."
+}}
+'''
+                                code_lower = code.lower()
+                                print(f"[WRAPPER] Interceptado cierre de {app_key}. Redirigiendo a cierre por ventana (ALT+F4).")
+                                break
+            except Exception as e_ind:
+                print(f"[WRAPPER ERROR] No se pudo procesar indice.json para cerrar: {e_ind}")
+
         timeout = 20 # Por defecto
         
         # Lista blanca de timeouts largos (90s)

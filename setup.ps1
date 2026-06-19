@@ -249,6 +249,36 @@ memory_path: memoria/
 }
 
 # ------------------------------
+# 7B. INDICE.JSON
+# ------------------------------
+Write-Host "`n[7B] Verificando indice.json..." -ForegroundColor Yellow
+
+$indicePath = Join-Path $root "indice.json"
+if (-not (Test-Path $indicePath)) {
+    Write-Host "    indice.json no encontrado. Generando valores por defecto..." -ForegroundColor Gray
+    $indiceDefault = @{
+        apps_uwp = @{
+            whatsapp = @{
+                open = "shell:AppsFolder\5319275A.WhatsAppDesktop_cv1g1gvanyjgm!App"
+                close_cmd = "Get-Process | Where-Object {`$_.Name -like '*WhatsApp*'} | Stop-Process -Force"
+            }
+            whatsappdesktop = @{
+                open = "shell:AppsFolder\5319275A.WhatsAppDesktop_cv1g1gvanyjgm!App"
+                close_cmd = "Get-Process | Where-Object {`$_.Name -like '*WhatsApp*'} | Stop-Process -Force"
+            }
+            spotify = @{
+                open = "shell:AppsFolder\SpotifyAB.SpotifyMusic_zpdnekdrzrea0!Spotify"
+                close_title = "Spotify"
+            }
+        }
+    }
+    $indiceDefault | ConvertTo-Json -Depth 5 | Set-Content -Path $indicePath -Encoding UTF8
+    Write-Host "    Creado indice.json con valores por defecto." -ForegroundColor Green
+} else {
+    Write-Host "    OK -- indice.json ya existe" -ForegroundColor Green
+}
+
+# ------------------------------
 # COMMIT AUTOMATICO
 # ------------------------------
 Write-Host "`n[Git] Registrando estado..." -ForegroundColor Yellow
