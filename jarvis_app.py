@@ -938,21 +938,32 @@ class JarvisApp(ctk.CTk):
                         else:
                             subprocess.Popen([open_path])
                         return self._registrar_y_retornar_apertura(nombre, open_path)
-                # Coincidencia difusa
-                for key, datos in cat_dict.items():
-                    if nombre_lower in key or key in nombre_lower:
-                        open_path = datos.get("open")
-                        if open_path:
-                            if open_path.startswith("shell:"):
-                                subprocess.Popen(["explorer.exe", open_path], shell=False)
-                            else:
-                                subprocess.Popen([open_path])
-                            return self._registrar_y_retornar_apertura(nombre, open_path)
+                # Coincidencia difusa (solo si tiene longitud >= 3)
+                if len(nombre_lower) >= 3:
+                    for key, datos in cat_dict.items():
+                        if nombre_lower in key or key in nombre_lower:
+                            open_path = datos.get("open")
+                            if open_path:
+                                if open_path.startswith("shell:"):
+                                    subprocess.Popen(["explorer.exe", open_path], shell=False)
+                                else:
+                                    subprocess.Popen([open_path])
+                                return self._registrar_y_retornar_apertura(nombre, open_path)
 
             # Estructura alternativa "aplicaciones"
             for key, datos in indice.get("aplicaciones", {}).items():
                 aliases = [a.lower() for a in datos.get("nombres", [])]
-                if nombre_lower in aliases or any(nombre_lower in a for a in aliases):
+                if nombre_lower in aliases:
+                    if datos.get("tipo") == "UWP" and datos.get("app_id"):
+                        subprocess.Popen(
+                            ["explorer.exe", f"shell:AppsFolder\\{datos['app_id']}"],
+                            shell=False
+                        )
+                        return self._registrar_y_retornar_apertura(nombre, datos.get("proceso", nombre))
+                    elif datos.get("ruta_tipica") and os.path.exists(datos["ruta_tipica"]):
+                        subprocess.Popen([datos["ruta_tipica"]])
+                        return self._registrar_y_retornar_apertura(nombre, datos.get("proceso", nombre))
+                elif len(nombre_lower) >= 3 and any(nombre_lower in a for a in aliases):
                     if datos.get("tipo") == "UWP" and datos.get("app_id"):
                         subprocess.Popen(
                             ["explorer.exe", f"shell:AppsFolder\\{datos['app_id']}"],
@@ -988,11 +999,17 @@ class JarvisApp(ctk.CTk):
         nombre_lower = nombre.lower()
         proceso_real = None
         
+        # Filtro de búsqueda estricto según longitud
+        if len(nombre_lower) <= 2:
+            filtro_ps = f"$_.Name -eq '{nombre_lower}' -or $_.MainWindowTitle -eq '{nombre}'"
+        else:
+            filtro_ps = f"$_.Name -like '*{nombre}*' -or $_.MainWindowTitle -like '*{nombre}*'"
+        
         try:
             # Buscar por nombre o MainWindowTitle que contenga la app
             res = subprocess.run(
                 ["powershell", "-NoProfile", "-Command",
-                 f"Get-Process | Where-Object {{$_.Name -like '*{nombre}*' -or $_.MainWindowTitle -like '*{nombre}*'}} | Select-Object -First 1 -ExpandProperty Name"],
+                 f"Get-Process | Where-Object {{{filtro_ps}}} | Select-Object -First 1 -ExpandProperty Name"],
                 capture_output=True, text=True, timeout=5
             )
             proceso_real = res.stdout.strip()
@@ -1010,9 +1027,15 @@ class JarvisApp(ctk.CTk):
             if "shell:" in proc_check.lower():
                 proc_check = nombre
                 
+            proc_check_lower = proc_check.lower()
+            if len(proc_check_lower) <= 2:
+                filtro_check = f"$_.Name -eq '{proc_check_lower}' -or $_.MainWindowTitle -eq '{proc_check}'"
+            else:
+                filtro_check = f"$_.Name -like '*{proc_check}*' -or $_.MainWindowTitle -like '*{proc_check}*'"
+                
             res_check = subprocess.run(
                 ["powershell", "-NoProfile", "-Command",
-                 f"Get-Process | Where-Object {{$_.Name -like '*{proc_check}*' -or $_.MainWindowTitle -like '*{proc_check}*'}} | Measure-Object | Select-Object -ExpandProperty Count"],
+                 f"Get-Process | Where-Object {{{filtro_check}}} | Measure-Object | Select-Object -ExpandProperty Count"],
                 capture_output=True, text=True, timeout=5
             )
             count = res_check.stdout.strip()
