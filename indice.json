@@ -1,0 +1,22 @@
+{
+  "apps_uwp": {
+    "whatsapp": {
+      "open": "shell:AppsFolder\\5319275A.WhatsAppDesktop_cv1g1gvanyjgm!App",
+      "close_cmd": "Get-Process | Where-Object {$_.Name -like '*WhatsApp*'} | Stop-Process -Force"
+    },
+    "whatsappdesktop": {
+      "open": "shell:AppsFolder\\5319275A.WhatsAppDesktop_cv1g1gvanyjgm!App",
+      "close_cmd": "Get-Process | Where-Object {$_.Name -like '*WhatsApp*'} | Stop-Process -Force"
+    },
+    "spotify": {
+      "open": "shell:AppsFolder\\SpotifyAB.SpotifyMusic_zpdnekdrzrea0!Spotify",
+      "close_title": "Spotify"
+    }
+  },
+  "apps_custom": {
+    "autofirma": {
+      "open": "C:\\Program Files\\Autofirma\\Autofirma\\Autofirma.exe",
+      "close_title": "Autofirma"
+    }
+  }
+}
