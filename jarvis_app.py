@@ -928,9 +928,23 @@ class JarvisApp(ctk.CTk):
             # Buscar en apps_uwp y apps_custom
             for cat in ["apps_uwp", "apps_custom"]:
                 cat_dict = indice.get(cat, {})
+                target_app_key = None
+                datos = None
+                
                 # Coincidencia exacta o alias en claves
                 if nombre_lower in cat_dict:
+                    target_app_key = nombre_lower
                     datos = cat_dict[nombre_lower]
+                else:
+                    # Buscar en los aliases "nombres"
+                    for key, val in cat_dict.items():
+                        aliases = [a.lower() for a in val.get("nombres", [])]
+                        if nombre_lower in aliases:
+                            target_app_key = key
+                            datos = val
+                            break
+                            
+                if datos:
                     open_path = datos.get("open")
                     if open_path:
                         if open_path.startswith("shell:"):
@@ -938,10 +952,24 @@ class JarvisApp(ctk.CTk):
                         else:
                             subprocess.Popen([open_path])
                         return self._registrar_y_retornar_apertura(nombre, open_path)
+                    elif datos.get("lnk"):
+                        try:
+                            es_path = os.path.join(BASE_DIR, "herramientas", "es.exe")
+                            nombre_busqueda = target_app_key
+                            res = subprocess.run([es_path, nombre_busqueda + ".lnk"], capture_output=True, text=True, timeout=5)
+                            lineas = [l.strip() for l in res.stdout.strip().splitlines() if l.strip().lower().endswith(f"\\{nombre_busqueda}.lnk")]
+                            if lineas:
+                                ruta_lnk = lineas[0]
+                                subprocess.Popen(["cmd", "/c", "start", "", ruta_lnk], shell=False)
+                                return self._registrar_y_retornar_apertura(nombre, os.path.basename(ruta_lnk))
+                        except Exception:
+                            pass
+
                 # Coincidencia difusa (solo si tiene longitud >= 3)
                 if len(nombre_lower) >= 3:
                     for key, datos in cat_dict.items():
-                        if nombre_lower in key or key in nombre_lower:
+                        aliases = [a.lower() for a in datos.get("nombres", [])]
+                        if nombre_lower in key or key in nombre_lower or any(nombre_lower in a or a in nombre_lower for a in aliases):
                             open_path = datos.get("open")
                             if open_path:
                                 if open_path.startswith("shell:"):
@@ -949,6 +977,18 @@ class JarvisApp(ctk.CTk):
                                 else:
                                     subprocess.Popen([open_path])
                                 return self._registrar_y_retornar_apertura(nombre, open_path)
+                            elif datos.get("lnk"):
+                                try:
+                                    es_path = os.path.join(BASE_DIR, "herramientas", "es.exe")
+                                    nombre_busqueda = key
+                                    res = subprocess.run([es_path, nombre_busqueda + ".lnk"], capture_output=True, text=True, timeout=5)
+                                    lineas = [l.strip() for l in res.stdout.strip().splitlines() if l.strip().lower().endswith(f"\\{nombre_busqueda}.lnk")]
+                                    if lineas:
+                                        ruta_lnk = lineas[0]
+                                        subprocess.Popen(["cmd", "/c", "start", "", ruta_lnk], shell=False)
+                                        return self._registrar_y_retornar_apertura(nombre, os.path.basename(ruta_lnk))
+                                except Exception:
+                                    pass
 
             # Estructura alternativa "aplicaciones"
             for key, datos in indice.get("aplicaciones", {}).items():
@@ -976,7 +1016,7 @@ class JarvisApp(ctk.CTk):
         except Exception:
             pass
 
-        # 2. Buscar con es.exe
+        # 2. Buscar con es.exe para ejecutables .exe
         try:
             es_path = os.path.join(BASE_DIR, "herramientas", "es.exe")
             res = subprocess.run([es_path, nombre + ".exe"], capture_output=True, text=True, timeout=5)
@@ -986,6 +1026,19 @@ class JarvisApp(ctk.CTk):
                 ruta = lineas[0]
                 subprocess.Popen([ruta])
                 return self._registrar_y_retornar_apertura(nombre, os.path.basename(ruta))
+        except Exception:
+            pass
+
+        # 3. Buscar con es.exe para accesos directos .lnk
+        try:
+            es_path = os.path.join(BASE_DIR, "herramientas", "es.exe")
+            res = subprocess.run([es_path, nombre + ".lnk"], capture_output=True, text=True, timeout=5)
+            # Exigir coincidencia exacta del nombre de archivo
+            lineas = [l.strip() for l in res.stdout.strip().splitlines() if l.strip().lower().endswith(f"\\{nombre_lower}.lnk")]
+            if lineas:
+                ruta_lnk = lineas[0]
+                subprocess.Popen(["cmd", "/c", "start", "", ruta_lnk], shell=False)
+                return self._registrar_y_retornar_apertura(nombre, os.path.basename(ruta_lnk))
         except Exception:
             pass
 
