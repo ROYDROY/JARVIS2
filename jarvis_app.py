@@ -1658,12 +1658,51 @@ class JarvisApp(ctk.CTk):
                 indice_path = r"C:\JARVIS2\indice.json"
                 if os.path.exists(indice_path):
                     with open(indice_path, "r", encoding="utf-8") as f_ind:
-                        apps_conocidas = json.load(f_ind)
-                    for app_key, data in apps_conocidas.get("apps_uwp", {}).items():
-                        if app_key in code_lower:
-                            uwp_path = data.get("open")
-                            close_title = data.get("close_title")
-                            if uwp_path:
+                        indice = json.load(f_ind)
+                    
+                    # 1. Extraer y normalizar el término de búsqueda de es.exe
+                    import re
+                    # Quitar es.exe al inicio
+                    term = re.sub(r'^(powershell\s+|python\s+)?(es\.exe|es)\s+', '', code, flags=re.IGNORECASE)
+                    term = re.sub(r'\.(lnk|exe|app|com|bat)\b', '', term, flags=re.IGNORECASE)
+                    nombre_normalizado = term.replace("*", "").replace("\"", "").replace("'", "").strip().lower()
+                    
+                    if nombre_normalizado:
+                        uwp_data = None
+                        custom_data = None
+                        matched_key = None
+                        
+                        uwp_dict = indice.get("apps_uwp", {})
+                        custom_dict = indice.get("apps_custom", {})
+                        
+                        # A. Buscar coincidencia exacta
+                        if nombre_normalizado in uwp_dict:
+                            uwp_data = uwp_dict[nombre_normalizado]
+                            matched_key = nombre_normalizado
+                        elif nombre_normalizado in custom_dict:
+                            custom_data = custom_dict[nombre_normalizado]
+                            matched_key = nombre_normalizado
+                        
+                        # B. Búsqueda difusa/aproximada en claves (clave contenida o continente)
+                        if not uwp_data and not custom_data:
+                            for clave in uwp_dict:
+                                if clave in nombre_normalizado or nombre_normalizado in clave:
+                                    uwp_data = uwp_dict[clave]
+                                    matched_key = clave
+                                    break
+                            if not uwp_data:
+                                for clave in custom_dict:
+                                    if clave in nombre_normalizado or nombre_normalizado in clave:
+                                        custom_data = custom_dict[clave]
+                                        matched_key = clave
+                                        break
+                        
+                        # C. Redirigir el código de ejecución si hubo coincidencia
+                        target_data = uwp_data if uwp_data else custom_data
+                        if target_data:
+                            open_path = target_data.get("open")
+                            close_title = target_data.get("close_title")
+                            if open_path:
                                 if close_title:
                                     code = f'''
 $ya_abierto = Get-Process | Where-Object {{$_.MainWindowTitle -like "*{close_title}*"}} | Select-Object -First 1
@@ -1677,36 +1716,75 @@ if ($ya_abierto -and $ya_abierto.MainWindowHandle -ne 0) {{
     }}
 "@
     [WinFocus]::SetForegroundWindow($ya_abierto.MainWindowHandle)
-    Write-Output "{app_key} ya estaba abierto. Traído al frente."
+    Write-Output "{matched_key} ya estaba abierto. Traído al frente."
 }} else {{
-    Start-Process "{uwp_path}"
-    Write-Output "{app_key} lanzado correctamente."
+    Start-Process "{open_path}"
+    Write-Output "{matched_key} lanzado correctamente."
 }}
 '''
                                 else:
-                                    code = f'Start-Process "{uwp_path}"'
+                                    code = f'Start-Process "{open_path}"'
                                 code_lower = code.lower()
-                                print(f"[WRAPPER] Interceptado {app_key}. Redirigiendo búsqueda es.exe a lanzamiento directo con control de foco.")
-                                break
+                                print(f"[WRAPPER] Interceptado '{nombre_normalizado}' (match '{matched_key}'). Redirigiendo a lanzamiento directo.")
             except Exception as e_ind:
-                print(f"[WRAPPER ERROR] No se pudo procesar indice.json para abrir: {e_ind}")
+                print(f"[WRAPPER ERROR] No se pudo procesar abrir desde indice.json: {e_ind}")
 
-        # Interceptador de cierre de aplicaciones UWP en indice.json para evitar errores de Stop-Process
+        # Interceptador de cierre de aplicaciones en indice.json para evitar errores
         if lang != "python" and ("stop-process" in code_lower or "stopprocess" in code_lower):
             try:
                 indice_path = r"C:\JARVIS2\indice.json"
                 if os.path.exists(indice_path):
                     with open(indice_path, "r", encoding="utf-8") as f_ind:
-                        apps_conocidas = json.load(f_ind)
-                    for app_key, data in apps_conocidas.get("apps_uwp", {}).items():
-                        if app_key in code_lower:
-                            close_cmd = data.get("close_cmd")
-                            close_title = data.get("close_title")
+                        indice = json.load(f_ind)
+                    
+                    # Extraer el argumento de Stop-Process (el nombre del proceso)
+                    import re
+                    match_name = re.search(r'(?:stop-process|stopprocess)\s+(?:-name\s+|-processname\s+)?["\']?([^"\s\'-]+)["\']?', code_lower)
+                    if match_name:
+                        nombre_normalizado = match_name.group(1).strip().lower()
+                    else:
+                        nombre_normalizado = re.sub(r'^(powershell\s+|python\s+)?(stop-process|stopprocess)\s+', '', code_lower)
+                        nombre_normalizado = nombre_normalizado.replace("\"", "").replace("'", "").strip()
+                    
+                    if nombre_normalizado:
+                        uwp_data = None
+                        custom_data = None
+                        matched_key = None
+                        
+                        uwp_dict = indice.get("apps_uwp", {})
+                        custom_dict = indice.get("apps_custom", {})
+                        
+                        # A. Buscar coincidencia exacta
+                        if nombre_normalizado in uwp_dict:
+                            uwp_data = uwp_dict[nombre_normalizado]
+                            matched_key = nombre_normalizado
+                        elif nombre_normalizado in custom_dict:
+                            custom_data = custom_dict[nombre_normalizado]
+                            matched_key = nombre_normalizado
+                            
+                        # B. Búsqueda difusa/aproximada
+                        if not uwp_data and not custom_data:
+                            for clave in uwp_dict:
+                                if clave in nombre_normalizado or nombre_normalizado in clave:
+                                    uwp_data = uwp_dict[clave]
+                                    matched_key = clave
+                                    break
+                            if not uwp_data:
+                                for clave in custom_dict:
+                                    if clave in nombre_normalizado or nombre_normalizado in clave:
+                                        custom_data = custom_dict[clave]
+                                        matched_key = clave
+                                        break
+                                        
+                        # C. Aplicar lógica de cierre
+                        target_data = uwp_data if uwp_data else custom_data
+                        if target_data:
+                            close_cmd = target_data.get("close_cmd")
+                            close_title = target_data.get("close_title")
                             if close_cmd:
                                 code = close_cmd
                                 code_lower = code.lower()
-                                print(f"[WRAPPER] Interceptado cierre de {app_key}. Redirigiendo a comando de cierre personalizado: {code}")
-                                break
+                                print(f"[WRAPPER] Interceptado cierre de '{nombre_normalizado}' (match '{matched_key}'). Redirigiendo a comando de cierre personalizado: {code}")
                             elif close_title:
                                 code = f'''
 Add-Type @"
@@ -1720,16 +1798,15 @@ public class WinAPI {{
 $proc = Get-Process | Where-Object {{$_.MainWindowTitle -like "*{close_title}*"}} | Select-Object -First 1
 if ($proc -and $proc.MainWindowHandle -ne 0) {{
     [WinAPI]::PostMessage($proc.MainWindowHandle, 0x0010, [IntPtr]::Zero, [IntPtr]::Zero)
-    Write-Output "{app_key} cerrado correctamente."
+    Write-Output "{matched_key} cerrado correctamente."
 }} else {{
     Write-Output "La aplicación no está abierta."
 }}
 '''
                                 code_lower = code.lower()
-                                print(f"[WRAPPER] Interceptado cierre de {app_key}. Redirigiendo a cierre por ventana (ALT+F4).")
-                                break
+                                print(f"[WRAPPER] Interceptado cierre de '{nombre_normalizado}' (match '{matched_key}'). Redirigiendo a cierre por ventana (WM_CLOSE).")
             except Exception as e_ind:
-                print(f"[WRAPPER ERROR] No se pudo procesar indice.json para cerrar: {e_ind}")
+                print(f"[WRAPPER ERROR] No se pudo procesar cierre desde indice.json: {e_ind}")
 
         timeout = 20 # Por defecto
         
