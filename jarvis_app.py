@@ -937,8 +937,7 @@ class JarvisApp(ctk.CTk):
                             subprocess.Popen(["explorer.exe", open_path], shell=False)
                         else:
                             subprocess.Popen([open_path])
-                        self.procesos_activos[nombre_lower] = open_path
-                        return f"{nombre.capitalize()} abierta."
+                        return self._registrar_y_retornar_apertura(nombre, open_path)
                 # Coincidencia difusa
                 for key, datos in cat_dict.items():
                     if nombre_lower in key or key in nombre_lower:
@@ -948,8 +947,7 @@ class JarvisApp(ctk.CTk):
                                 subprocess.Popen(["explorer.exe", open_path], shell=False)
                             else:
                                 subprocess.Popen([open_path])
-                            self.procesos_activos[nombre_lower] = open_path
-                            return f"{nombre.capitalize()} abierta."
+                            return self._registrar_y_retornar_apertura(nombre, open_path)
 
             # Estructura alternativa "aplicaciones"
             for key, datos in indice.get("aplicaciones", {}).items():
@@ -960,12 +958,10 @@ class JarvisApp(ctk.CTk):
                             ["explorer.exe", f"shell:AppsFolder\\{datos['app_id']}"],
                             shell=False
                         )
-                        self.procesos_activos[nombre_lower] = datos.get("proceso", nombre)
-                        return f"{nombre.capitalize()} abierta."
+                        return self._registrar_y_retornar_apertura(nombre, datos.get("proceso", nombre))
                     elif datos.get("ruta_tipica") and os.path.exists(datos["ruta_tipica"]):
                         subprocess.Popen([datos["ruta_tipica"]])
-                        self.procesos_activos[nombre_lower] = datos.get("proceso", nombre)
-                        return f"{nombre.capitalize()} abierta."
+                        return self._registrar_y_retornar_apertura(nombre, datos.get("proceso", nombre))
         except Exception:
             pass
 
@@ -977,20 +973,39 @@ class JarvisApp(ctk.CTk):
             if lineas:
                 ruta = lineas[0]
                 subprocess.Popen([ruta])
-                self.procesos_activos[nombre_lower] = os.path.basename(ruta)
-                return f"{nombre.capitalize()} abierta."
+                return self._registrar_y_retornar_apertura(nombre, os.path.basename(ruta))
         except Exception:
             pass
 
         return f"No he encontrado {nombre} en el sistema."
 
+    def _registrar_y_retornar_apertura(self, nombre, default_proc):
+        """Intenta capturar el nombre real del proceso en ejecución y lo registra en procesos_activos."""
+        import time, subprocess
+        time.sleep(1.5)  # Dar tiempo a que arranque
+        try:
+            res = subprocess.run(
+                ["powershell", "-NoProfile", "-Command",
+                 f"Get-Process | Where-Object {{$_.Name -like '*{nombre}*'}} | Select-Object -First 1 -ExpandProperty Name"],
+                capture_output=True, text=True, timeout=5
+            )
+            proceso_real = res.stdout.strip()
+            if proceso_real:
+                self.procesos_activos[nombre.lower()] = proceso_real + ".exe"
+            else:
+                self.procesos_activos[nombre.lower()] = default_proc
+        except Exception:
+            self.procesos_activos[nombre.lower()] = default_proc
+            
+        return f"{nombre.capitalize()} abierta."
+
     def _cerrar_app_python(self, nombre):
-        """Cierra una app por nombre de proceso. Sin LLM."""
+        """Cierra una app por nombre de proceso o comando específico. Sin LLM."""
         import subprocess, os
 
         nombre_lower = nombre.lower()
         
-        # 1. Buscar comandos de cierre específicos en indice.json
+        # 1. Buscar comandos de cierre específicos en indice.json (UWP/Custom)
         try:
             with open(os.path.join(BASE_DIR, "indice.json"), encoding="utf-8") as f:
                 indice = json.load(f)
@@ -1025,11 +1040,24 @@ class JarvisApp(ctk.CTk):
 
         # 2. Buscar en procesos_activos
         proceso = self.procesos_activos.get(nombre_lower)
+
+        # 3. Si no está en activos, buscar el .exe real con es.exe
         if not proceso:
-            proceso = nombre
+            try:
+                es_path = os.path.join(BASE_DIR, "herramientas", "es.exe")
+                res = subprocess.run([es_path, nombre + ".exe"], capture_output=True, text=True, timeout=5)
+                lineas = [l.strip() for l in res.stdout.strip().splitlines() if l.strip().lower().endswith(".exe")]
+                if lineas:
+                    proceso = os.path.basename(lineas[0])
+            except Exception:
+                pass
+
+        if not proceso:
+            proceso = nombre + ".exe"
 
         nombre_proceso = proceso.replace(".exe", "")
-        
+
+        # 4. Intentar taskkill por nombre exacto
         try:
             res = subprocess.run(
                 ["taskkill", "/F", "/IM", f"{nombre_proceso}.exe"],
@@ -1038,17 +1066,23 @@ class JarvisApp(ctk.CTk):
             if res.returncode == 0:
                 self.procesos_activos.pop(nombre_lower, None)
                 return f"{nombre.capitalize()} cerrada."
-            else:
-                res2 = subprocess.run(
-                    ["taskkill", "/F", "/IM", nombre_proceso],
-                    capture_output=True, text=True
-                )
-                if res2.returncode == 0:
-                    self.procesos_activos.pop(nombre_lower, None)
-                    return f"{nombre.capitalize()} cerrada."
-                return f"No he podido cerrar {nombre}. ¿Está abierta?"
-        except Exception as e:
-            return f"Error al cerrar {nombre}: {e}"
+        except Exception:
+            pass
+
+        # 5. Fallback: buscar en lista de procesos activos del sistema por nombre parcial usando PowerShell
+        try:
+            res = subprocess.run(
+                ["powershell", "-NoProfile", "-Command",
+                 f"Get-Process | Where-Object {{$_.Name -like '*{nombre}*'}} | Stop-Process -Force"],
+                capture_output=True, text=True, timeout=10
+            )
+            if res.returncode == 0:
+                self.procesos_activos.pop(nombre_lower, None)
+                return f"{nombre.capitalize()} cerrada."
+        except Exception:
+            pass
+
+        return f"No he podido cerrar {nombre}. Verifica que esté abierta."
 
     def generar_respuesta_llm(self, prompt):
         try:
