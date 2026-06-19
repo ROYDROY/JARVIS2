@@ -111,9 +111,9 @@ def seleccionar_cerebro(prompt, modo="Automático"):
                 keywords_codigo = ["script", "código", "codigo", "programa", "error", "fall",
                                    "powershell", "python", "automatiza", "archivo", "carpeta",
                                    "ejecut", "comando", "json", "terminal", "consola", "instala", 
-                                   "descarga", "arranca", "abr", "inicia", "cierr", "apaga", "reinicia",
+                                   "descarga", "arranca", "abr", "abrir", "abre", "open", "inicia", "cierr", "cerrar", "cierra", "close", "stop", "apaga", "reinicia",
                                    "borr", "elimin", "quit", "suprim", "destruy", "carg", "mat",
-                                   "busca", "encuentra", "es.exe", "exe", "whatsapp"]
+                                   "busca", "encuentra", "es.exe", "exe", "whatsapp", "spotify", "autofirma", "chrome", "notepad", "bloc de notas"]
                 if any(k in prompt_lower for k in keywords_codigo):
                     es_codigo = True
                 else:
@@ -179,6 +179,7 @@ class JarvisApp(ctk.CTk):
         # Colas e inicialización
         self.ui_queue = queue.Queue()
         self.is_generating = False
+        self.procesos_activos = {}
         self._prompt_lock = threading.Lock()  # Evita ejecución concurrente de dos prompts
         self._admin_granted_event = threading.Event()  # Señal para detectar activación del Modo Admin
         self._abortar_generacion = False
@@ -946,6 +947,10 @@ class JarvisApp(ctk.CTk):
                     if self.switch_clicky.get():
                         system_context += "\n- Ver/Analizar imágenes y capturas de pantalla (USA BLOQUE ```powershell): `C:\\JARVIS2\\venv\\Scripts\\python.exe C:\\JARVIS2\\herramientas\\NervioOptico.py \"ruta_de_la_imagen\"`"
                     
+                    if hasattr(self, "procesos_activos") and self.procesos_activos:
+                        lista_activos = ", ".join(self.procesos_activos.keys())
+                        system_context += f"\n\n[PROCESOS ACTIVOS EN ESTA SESIÓN]:\nLos siguientes procesos han sido abiertos por ti (JARVIS) en esta sesión y siguen activos: {lista_activos}. Si te piden cerrarlos, hazlo usando Stop-Process y retíralos de memoria."
+                        
                     interpreter.system_message = system_context
             except Exception:
                 pass
@@ -1741,6 +1746,7 @@ class JarvisApp(ctk.CTk):
                         open_path = target_data.get("open")
                         close_title = target_data.get("close_title")
                         if open_path:
+                            self.procesos_activos[matched_key.lower()] = True
                             if close_title:
                                 code = f'''
 $ya_abierto = Get-Process | Where-Object {{$_.MainWindowTitle -like "*{close_title}*"}} | Select-Object -First 1
@@ -1783,6 +1789,7 @@ if ($ya_abierto -and $ya_abierto.MainWindowHandle -ne 0) {{
                             path_to_open = valid_results[0]
                             print(f"[WRAPPER] 1 resultado encontrado: '{path_to_open}'. Registrando y abriendo.")
                             self.registrar_app_en_indice(nombre_normalizado, path_to_open)
+                            self.procesos_activos[nombre_normalizado.lower()] = True
                             
                             # Generar código para ejecutar en PowerShell
                             code = f'Start-Process "{path_to_open}"'
@@ -1807,6 +1814,7 @@ if ($ya_abierto -and $ya_abierto.MainWindowHandle -ne 0) {{
                             if selected_path:
                                 print(f"[WRAPPER] El usuario seleccionó: '{selected_path}'. Registrando y abriendo.")
                                 self.registrar_app_en_indice(nombre_normalizado, selected_path)
+                                self.procesos_activos[nombre_normalizado.lower()] = True
                                 code = f'Start-Process "{selected_path}"'
                                 code_lower = code.lower()
                             else:
@@ -1851,6 +1859,8 @@ if ($ya_abierto -and $ya_abierto.MainWindowHandle -ne 0) {{
                     if not existe_ya:
                         print(f"[WRAPPER] Detectado Start-Process manual de '{ruta_manual}'. Registrando automáticamente como '{nombre_app}'...")
                         self.registrar_app_en_indice(nombre_app, ruta_manual)
+                    
+                    self.procesos_activos[nombre_app.lower()] = True
             except Exception as e_sp:
                 print(f"[WRAPPER ERROR] Error al autoregistrar app en Start-Process: {e_sp}")
 
@@ -1900,6 +1910,11 @@ if ($ya_abierto -and $ya_abierto.MainWindowHandle -ne 0) {{
                                         custom_data = custom_dict[clave]
                                         matched_key = clave
                                         break
+                                        
+                        if nombre_normalizado:
+                            self.procesos_activos.pop(nombre_normalizado.lower(), None)
+                        if matched_key:
+                            self.procesos_activos.pop(matched_key.lower(), None)
                                         
                         # C. Aplicar lógica de cierre
                         target_data = uwp_data if uwp_data else custom_data
