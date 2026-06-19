@@ -956,7 +956,7 @@ class JarvisApp(ctk.CTk):
                         try:
                             es_path = os.path.join(BASE_DIR, "herramientas", "es.exe")
                             nombre_busqueda = target_app_key
-                            res = subprocess.run([es_path, nombre_busqueda + ".lnk"], capture_output=True, text=True, timeout=5)
+                            res = subprocess.run([es_path, "-i", nombre_busqueda + ".lnk"], capture_output=True, text=True, timeout=5)
                             lineas = [l.strip() for l in res.stdout.strip().splitlines() if l.strip().lower().endswith(f"\\{nombre_busqueda}.lnk")]
                             if lineas:
                                 ruta_lnk = lineas[0]
@@ -981,7 +981,7 @@ class JarvisApp(ctk.CTk):
                                 try:
                                     es_path = os.path.join(BASE_DIR, "herramientas", "es.exe")
                                     nombre_busqueda = key
-                                    res = subprocess.run([es_path, nombre_busqueda + ".lnk"], capture_output=True, text=True, timeout=5)
+                                    res = subprocess.run([es_path, "-i", nombre_busqueda + ".lnk"], capture_output=True, text=True, timeout=5)
                                     lineas = [l.strip() for l in res.stdout.strip().splitlines() if l.strip().lower().endswith(f"\\{nombre_busqueda}.lnk")]
                                     if lineas:
                                         ruta_lnk = lineas[0]
@@ -1019,7 +1019,7 @@ class JarvisApp(ctk.CTk):
         # 2. Buscar con es.exe para ejecutables .exe
         try:
             es_path = os.path.join(BASE_DIR, "herramientas", "es.exe")
-            res = subprocess.run([es_path, nombre + ".exe"], capture_output=True, text=True, timeout=5)
+            res = subprocess.run([es_path, "-i", nombre + ".exe"], capture_output=True, text=True, timeout=5)
             # Exigir coincidencia exacta del nombre de archivo para evitar silencio falso con búsquedas parciales
             lineas = [l.strip() for l in res.stdout.strip().splitlines() if l.strip().lower().endswith(f"\\{nombre_lower}.exe")]
             if lineas:
@@ -1032,7 +1032,7 @@ class JarvisApp(ctk.CTk):
         # 3. Buscar con es.exe para accesos directos .lnk
         try:
             es_path = os.path.join(BASE_DIR, "herramientas", "es.exe")
-            res = subprocess.run([es_path, nombre + ".lnk"], capture_output=True, text=True, timeout=5)
+            res = subprocess.run([es_path, "-i", nombre + ".lnk"], capture_output=True, text=True, timeout=5)
             # Exigir coincidencia exacta del nombre de archivo
             lineas = [l.strip() for l in res.stdout.strip().splitlines() if l.strip().lower().endswith(f"\\{nombre_lower}.lnk")]
             if lineas:
@@ -1152,7 +1152,7 @@ class JarvisApp(ctk.CTk):
         if not proceso:
             try:
                 es_path = os.path.join(BASE_DIR, "herramientas", "es.exe")
-                res = subprocess.run([es_path, nombre + ".exe"], capture_output=True, text=True, timeout=5)
+                res = subprocess.run([es_path, "-i", nombre + ".exe"], capture_output=True, text=True, timeout=5)
                 # Exigir coincidencia exacta del nombre de archivo para evitar silencio falso con búsquedas parciales
                 lineas = [l.strip() for l in res.stdout.strip().splitlines() if l.strip().lower().endswith(f"\\{nombre_lower}.exe")]
                 if lineas:
