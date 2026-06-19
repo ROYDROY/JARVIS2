@@ -884,8 +884,184 @@ class JarvisApp(ctk.CTk):
 
         threading.Thread(target=self.generar_respuesta_llm, args=(texto,), daemon=True).start()
 
+    def _interceptar_intencion_os(self, prompt):
+        """
+        Intercepta intenciones de abrir/cerrar apps ANTES del LLM.
+        Retorna (True, respuesta) si se manejó, (False, None) si debe ir al LLM.
+        """
+        import re
+        p = prompt.strip().lower()
+
+        # Patrones de apertura
+        patron_abrir = re.search(
+            r'\b(abre|abrir|open|lanza|lanzar|inicia|iniciar|ejecuta|ejecutar|arranca|arrancar)\b\s+(.+)',
+            p
+        )
+        # Patrones de cierre
+        patron_cerrar = re.search(
+            r'\b(cierra|cerrar|close|mata|matar|termina|terminar|para|parar|apaga|apagar|kill|stop)\b\s+(.+)',
+            p
+        )
+
+        if patron_abrir:
+            nombre_app = patron_abrir.group(2).strip()
+            resultado = self._abrir_app_python(nombre_app)
+            return True, resultado
+
+        if patron_cerrar:
+            nombre_app = patron_cerrar.group(2).strip()
+            resultado = self._cerrar_app_python(nombre_app)
+            return True, resultado
+
+        return False, None
+
+    def _abrir_app_python(self, nombre):
+        """Abre una app usando indice.json + es.exe. Sin LLM."""
+        import subprocess, os
+
+        try:
+            with open(os.path.join(BASE_DIR, "indice.json"), encoding="utf-8") as f:
+                indice = json.load(f)
+            
+            nombre_lower = nombre.lower()
+            
+            # Buscar en apps_uwp y apps_custom
+            for cat in ["apps_uwp", "apps_custom"]:
+                cat_dict = indice.get(cat, {})
+                # Coincidencia exacta o alias en claves
+                if nombre_lower in cat_dict:
+                    datos = cat_dict[nombre_lower]
+                    open_path = datos.get("open")
+                    if open_path:
+                        if open_path.startswith("shell:"):
+                            subprocess.Popen(["explorer.exe", open_path], shell=False)
+                        else:
+                            subprocess.Popen([open_path])
+                        self.procesos_activos[nombre_lower] = open_path
+                        return f"{nombre.capitalize()} abierta."
+                # Coincidencia difusa
+                for key, datos in cat_dict.items():
+                    if nombre_lower in key or key in nombre_lower:
+                        open_path = datos.get("open")
+                        if open_path:
+                            if open_path.startswith("shell:"):
+                                subprocess.Popen(["explorer.exe", open_path], shell=False)
+                            else:
+                                subprocess.Popen([open_path])
+                            self.procesos_activos[nombre_lower] = open_path
+                            return f"{nombre.capitalize()} abierta."
+
+            # Estructura alternativa "aplicaciones"
+            for key, datos in indice.get("aplicaciones", {}).items():
+                aliases = [a.lower() for a in datos.get("nombres", [])]
+                if nombre_lower in aliases or any(nombre_lower in a for a in aliases):
+                    if datos.get("tipo") == "UWP" and datos.get("app_id"):
+                        subprocess.Popen(
+                            ["explorer.exe", f"shell:AppsFolder\\{datos['app_id']}"],
+                            shell=False
+                        )
+                        self.procesos_activos[nombre_lower] = datos.get("proceso", nombre)
+                        return f"{nombre.capitalize()} abierta."
+                    elif datos.get("ruta_tipica") and os.path.exists(datos["ruta_tipica"]):
+                        subprocess.Popen([datos["ruta_tipica"]])
+                        self.procesos_activos[nombre_lower] = datos.get("proceso", nombre)
+                        return f"{nombre.capitalize()} abierta."
+        except Exception:
+            pass
+
+        # 2. Buscar con es.exe
+        try:
+            es_path = os.path.join(BASE_DIR, "herramientas", "es.exe")
+            res = subprocess.run([es_path, nombre + ".exe"], capture_output=True, text=True, timeout=5)
+            lineas = [l.strip() for l in res.stdout.strip().splitlines() if l.strip().lower().endswith(".exe")]
+            if lineas:
+                ruta = lineas[0]
+                subprocess.Popen([ruta])
+                self.procesos_activos[nombre_lower] = os.path.basename(ruta)
+                return f"{nombre.capitalize()} abierta."
+        except Exception:
+            pass
+
+        return f"No he encontrado {nombre} en el sistema."
+
+    def _cerrar_app_python(self, nombre):
+        """Cierra una app por nombre de proceso. Sin LLM."""
+        import subprocess, os
+
+        nombre_lower = nombre.lower()
+        
+        # 1. Buscar comandos de cierre específicos en indice.json
+        try:
+            with open(os.path.join(BASE_DIR, "indice.json"), encoding="utf-8") as f:
+                indice = json.load(f)
+            
+            for cat in ["apps_uwp", "apps_custom"]:
+                cat_dict = indice.get(cat, {})
+                target_data = None
+                if nombre_lower in cat_dict:
+                    target_data = cat_dict[nombre_lower]
+                else:
+                    for key, val in cat_dict.items():
+                        if nombre_lower in key or key in nombre_lower:
+                            target_data = val
+                            break
+                
+                if target_data:
+                    close_cmd = target_data.get("close_cmd")
+                    close_title = target_data.get("close_title")
+                    if close_cmd:
+                        res = subprocess.run(["powershell", "-Command", close_cmd], capture_output=True, text=True)
+                        if res.returncode == 0:
+                            self.procesos_activos.pop(nombre_lower, None)
+                            return f"{nombre.capitalize()} cerrada."
+                    elif close_title:
+                        cmd_ps = f'Get-Process | Where-Object {{$_.MainWindowTitle -like "*{close_title}*"}} | Stop-Process -Force'
+                        res = subprocess.run(["powershell", "-Command", cmd_ps], capture_output=True, text=True)
+                        if res.returncode == 0:
+                            self.procesos_activos.pop(nombre_lower, None)
+                            return f"{nombre.capitalize()} cerrada."
+        except Exception:
+            pass
+
+        # 2. Buscar en procesos_activos
+        proceso = self.procesos_activos.get(nombre_lower)
+        if not proceso:
+            proceso = nombre
+
+        nombre_proceso = proceso.replace(".exe", "")
+        
+        try:
+            res = subprocess.run(
+                ["taskkill", "/F", "/IM", f"{nombre_proceso}.exe"],
+                capture_output=True, text=True
+            )
+            if res.returncode == 0:
+                self.procesos_activos.pop(nombre_lower, None)
+                return f"{nombre.capitalize()} cerrada."
+            else:
+                res2 = subprocess.run(
+                    ["taskkill", "/F", "/IM", nombre_proceso],
+                    capture_output=True, text=True
+                )
+                if res2.returncode == 0:
+                    self.procesos_activos.pop(nombre_lower, None)
+                    return f"{nombre.capitalize()} cerrada."
+                return f"No he podido cerrar {nombre}. ¿Está abierta?"
+        except Exception as e:
+            return f"Error al cerrar {nombre}: {e}"
+
     def generar_respuesta_llm(self, prompt):
         try:
+            # INTERCEPTOR OS — va PRIMERO, antes de todo
+            manejado, respuesta_os = self._interceptar_intencion_os(prompt)
+            if manejado:
+                self.ui_queue.put(("chat_header", f"\n[MoE] Fast-Track: Interceptor OS\n[JARVIS]: "))
+                self.ui_queue.put(("chat_stream_final", respuesta_os))
+                self.ui_queue.put(("chat", "\n─────────────────────────────────\n"))
+                self.ui_queue.put(("chat_final", respuesta_os))
+                self.ui_queue.put(("hablar", respuesta_os))
+                return
+
             # --- DETECCION Y ENVOLTORIO AUTOMATICO DE RUTAS DE ARCHIVOS ---
             import re
             prompt_final = prompt
