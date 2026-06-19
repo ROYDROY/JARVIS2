@@ -20,8 +20,11 @@ except ImportError:
 from datetime import datetime
 from dotenv import load_dotenv, set_key
 
+# Directorio base dinámico para portabilidad
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+
 # Cargar credenciales al arrancar
-load_dotenv(r"C:\JARVIS2\.env", override=True)
+load_dotenv(os.path.join(BASE_DIR, ".env"), override=True)
 
 # Limpiar comillas accidentales de las variables de entorno para evitar fallos de LiteLLM/Open Interpreter
 for api_key_name in ["GEMINI_API_KEY", "OPENAI_API_KEY", "ANTHROPIC_API_KEY", "GROQ_API_KEY", "GOOGLE_API_KEY"]:
@@ -33,7 +36,7 @@ for api_key_name in ["GEMINI_API_KEY", "OPENAI_API_KEY", "ANTHROPIC_API_KEY", "G
 # ==============================================================================
 from interpreter import interpreter
 
-sys.path.append(r"C:\JARVIS2\herramientas")
+sys.path.append(os.path.join(BASE_DIR, "herramientas"))
 try:
     from MotorVoz import hablar, escuchar, escuchar_pasivo
 except Exception:
@@ -61,7 +64,7 @@ except Exception:
 # ==============================================================================
 # CONFIGURACION INTERPRETER Y OLLAMA
 # ==============================================================================
-CONFIG_PATH = r"C:\JARVIS2\config.yaml"
+CONFIG_PATH = os.path.join(BASE_DIR, "config.yaml")
 config_data = {}
 try:
     with open(CONFIG_PATH, "r", encoding="utf-8-sig") as f:
@@ -193,7 +196,7 @@ class JarvisApp(ctk.CTk):
         
         # Configurar interpreter
         try:
-            with open(r"C:\JARVIS2\system.md", "r", encoding="utf-8-sig") as _f:
+            with open(os.path.join(BASE_DIR, "system.md"), "r", encoding="utf-8-sig") as _f:
                 system_msg = _f.read()
         except FileNotFoundError:
             SYSTEM_CHAT = (
@@ -221,8 +224,9 @@ class JarvisApp(ctk.CTk):
         
         # Cargar memoria RAM a corto plazo (para no perder el hilo al reiniciar la app)
         try:
-            if os.path.exists(r"C:\JARVIS2\ram_history.json"):
-                with open(r"C:\JARVIS2\ram_history.json", "r", encoding="utf-8") as f:
+            ram_history_path = os.path.join(BASE_DIR, "ram_history.json")
+            if os.path.exists(ram_history_path):
+                with open(ram_history_path, "r", encoding="utf-8") as f:
                     interpreter.messages = json.load(f)
         except Exception:
             interpreter.messages = []
@@ -251,7 +255,7 @@ class JarvisApp(ctk.CTk):
 
     def revisar_rutinas_arranque(self):
         try:
-            ruta_rutinas = r"C:\JARVIS2\config\rutinas.json"
+            ruta_rutinas = os.path.join(BASE_DIR, "config", "rutinas.json")
             if os.path.exists(ruta_rutinas):
                 with open(ruta_rutinas, "r", encoding="utf-8") as f:
                     rutinas = json.load(f)
@@ -477,7 +481,7 @@ class JarvisApp(ctk.CTk):
                 nombre_zip = f"JARVIS_BACKUP_{fecha}.zip"
                 ruta_zip = os.path.join(destino, nombre_zip)
                 
-                base_dir = r"C:\JARVIS2"
+                base_dir = BASE_DIR
                 
                 with zipfile.ZipFile(ruta_zip, 'w', zipfile.ZIP_DEFLATED) as zipf:
                     for root, dirs, files in os.walk(base_dir):
@@ -659,7 +663,7 @@ class JarvisApp(ctk.CTk):
 
     def abrir_gestor_apis(self):
         # Refrescar entorno (load_dotenv ya importado a nivel de módulo)
-        load_dotenv(r"C:\JARVIS2\.env", override=True)
+        load_dotenv(os.path.join(BASE_DIR, ".env"), override=True)
         
         if hasattr(self, "api_popup") and self.api_popup is not None and self.api_popup.winfo_exists():
             self.api_popup.focus()
@@ -678,7 +682,7 @@ class JarvisApp(ctk.CTk):
             new_key = entry_widget.get().strip()
             if new_key:
                 os.environ[api_env_name] = new_key
-                env_path = r"C:\JARVIS2\.env"
+                env_path = os.path.join(BASE_DIR, ".env")
                 try:
                     if not os.path.exists(env_path):
                         with open(env_path, 'a') as _ef:
@@ -693,7 +697,7 @@ class JarvisApp(ctk.CTk):
         def borrar_key(api_env_name, popup_window):
             if api_env_name in os.environ:
                 del os.environ[api_env_name]
-            env_path = r"C:\JARVIS2\.env"
+            env_path = os.path.join(BASE_DIR, ".env")
             if os.path.exists(env_path):
                 try:
                     with open(env_path, "r", encoding="utf-8") as f:
@@ -921,7 +925,7 @@ class JarvisApp(ctk.CTk):
                 
                 # Ejecutar OCR-Seguro.py localmente
                 res_ocr = subprocess.run(
-                    ["python", r"C:\JARVIS2\herramientas\OCR-Seguro.py", ruta_archivo_detectada],
+                    [sys.executable, os.path.join(BASE_DIR, "herramientas", "OCR-Seguro.py"), ruta_archivo_detectada],
                     capture_output=True, text=True, encoding="utf-8", errors="replace"
                 )
                 texto_ocr = res_ocr.stdout.strip()
@@ -936,16 +940,21 @@ class JarvisApp(ctk.CTk):
 
             # --- ACTUALIZACION DINAMICA DEL SYSTEM PROMPT SEGUN EXPANSIONES ---
             try:
-                system_md_path = r"C:\JARVIS2\system.md"
+                system_md_path = os.path.join(BASE_DIR, "system.md")
                 if os.path.exists(system_md_path):
                     with open(system_md_path, "r", encoding="utf-8-sig") as f:
                         system_context = f.read()
                     
+                    # Convertir barras invertidas para que coincidan con la sintaxis de PowerShell en el prompt
+                    esc_python = sys.executable.replace("\\", "\\\\")
+                    esc_youtube = os.path.join(BASE_DIR, "herramientas", "Resumir-Youtube.py").replace("\\", "\\\\")
+                    esc_optico = os.path.join(BASE_DIR, "herramientas", "NervioOptico.py").replace("\\", "\\\\")
+                    
                     if self.switch_youtube.get():
-                        system_context += "\n- Leer YouTube (USA BLOQUE ```powershell): `C:\\JARVIS2\\venv\\Scripts\\python.exe C:\\JARVIS2\\herramientas\\Resumir-Youtube.py \"URL\"`"
+                        system_context += f"\n- Leer YouTube (USA BLOQUE ```powershell): `{esc_python} {esc_youtube} \"URL\"`"
                     
                     if self.switch_clicky.get():
-                        system_context += "\n- Ver/Analizar imágenes y capturas de pantalla (USA BLOQUE ```powershell): `C:\\JARVIS2\\venv\\Scripts\\python.exe C:\\JARVIS2\\herramientas\\NervioOptico.py \"ruta_de_la_imagen\"`"
+                        system_context += f"\n- Ver/Analizar imágenes y capturas de pantalla (USA BLOQUE ```powershell): `{esc_python} {esc_optico} \"ruta_de_la_imagen\"`"
                     
                     if hasattr(self, "procesos_activos") and self.procesos_activos:
                         lista_activos = ", ".join(self.procesos_activos.keys())
@@ -981,7 +990,7 @@ class JarvisApp(ctk.CTk):
                 try:
                     import chromadb
                     from chromadb.utils import embedding_functions
-                    chroma_client = chromadb.PersistentClient(path=r"C:\JARVIS2\vector_db")
+                    chroma_client = chromadb.PersistentClient(path=os.path.join(BASE_DIR, "vector_db"))
                     ollama_ef = embedding_functions.OllamaEmbeddingFunction(
                         url="http://localhost:11434/api/embeddings", 
                         model_name="nomic-embed-text"
@@ -1186,7 +1195,7 @@ class JarvisApp(ctk.CTk):
                                 return
                             api_url = "https://integrate.api.nvidia.com/v1/chat/completions"
                             from dotenv import load_dotenv
-                            load_dotenv(r"C:\JARVIS2\.env", override=True)
+                            load_dotenv(os.path.join(BASE_DIR, ".env"), override=True)
                             headers = {"Authorization": f"Bearer {os.environ.get('NVIDIA_API_KEY', '')}", "Content-Type": "application/json"}
                             payload_react["model"] = os.environ.get("NVIDIA_MODEL", "meta/llama-3.1-70b-instruct")
                         else:
@@ -1552,7 +1561,7 @@ class JarvisApp(ctk.CTk):
 
             # 1. Guardar memoria RAM a corto plazo (para no perder el hilo al reiniciar la app)
             try:
-                with open(r"C:\JARVIS2\ram_history.json", "w", encoding="utf-8") as f:
+                with open(os.path.join(BASE_DIR, "ram_history.json"), "w", encoding="utf-8") as f:
                     json.dump(interpreter.messages, f, ensure_ascii=False, indent=4)
             except Exception:
                 pass
@@ -1562,7 +1571,7 @@ class JarvisApp(ctk.CTk):
                 try:
                     import chromadb
                     from chromadb.utils import embedding_functions
-                    chroma_client = chromadb.PersistentClient(path=r"C:\JARVIS2\vector_db")
+                    chroma_client = chromadb.PersistentClient(path=os.path.join(BASE_DIR, "vector_db"))
                     ollama_ef = embedding_functions.OllamaEmbeddingFunction(
                         url="http://localhost:11434/api/embeddings", 
                         model_name="nomic-embed-text"
@@ -1665,7 +1674,7 @@ class JarvisApp(ctk.CTk):
     def registrar_app_en_indice(self, nombre, ruta):
         """Registra una aplicación personalizada en indice.json de manera segura."""
         try:
-            indice_path = r"C:\JARVIS2\indice.json"
+            indice_path = os.path.join(BASE_DIR, "indice.json")
             if os.path.exists(indice_path):
                 with open(indice_path, "r", encoding="utf-8") as f:
                     indice = json.load(f)
@@ -1713,7 +1722,7 @@ class JarvisApp(ctk.CTk):
                         break
                 
                 if nombre_normalizado:
-                    indice_path = r"C:\JARVIS2\indice.json"
+                    indice_path = os.path.join(BASE_DIR, "indice.json")
                     if os.path.exists(indice_path):
                         with open(indice_path, "r", encoding="utf-8") as f_ind:
                             indice = json.load(f_ind)
@@ -1784,7 +1793,7 @@ if ($ya_abierto -and $ya_abierto.MainWindowHandle -ne 0) {{
                         print(f"[WRAPPER] '{nombre_normalizado}' no está en indice.json. Buscando en el sistema con es.exe...")
                         
                         # Ejecutar es.exe y capturar salida
-                        res_es = subprocess.run([r"C:\JARVIS2\herramientas\es.exe", nombre_normalizado], capture_output=True, text=True, encoding="utf-8", errors="replace")
+                        res_es = subprocess.run([os.path.join(BASE_DIR, "herramientas", "es.exe"), nombre_normalizado], capture_output=True, text=True, encoding="utf-8", errors="replace")
                         es_output = res_es.stdout
                         
                         lines = [line.strip() for line in es_output.splitlines() if line.strip()]
@@ -1855,7 +1864,7 @@ if ($ya_abierto -and $ya_abierto.MainWindowHandle -ne 0) {{
                     nombre_app = nombre_app.lower()
                     
                     # Registrar en indice.json si no está ya
-                    indice_path = r"C:\JARVIS2\indice.json"
+                    indice_path = os.path.join(BASE_DIR, "indice.json")
                     existe_ya = False
                     if os.path.exists(indice_path):
                         with open(indice_path, "r", encoding="utf-8") as f_ind:
@@ -1876,7 +1885,7 @@ if ($ya_abierto -and $ya_abierto.MainWindowHandle -ne 0) {{
         # Interceptador de cierre de aplicaciones en indice.json para evitar errores
         if lang != "python" and ("stop-process" in code_lower or "stopprocess" in code_lower):
             try:
-                indice_path = r"C:\JARVIS2\indice.json"
+                indice_path = os.path.join(BASE_DIR, "indice.json")
                 if os.path.exists(indice_path):
                     with open(indice_path, "r", encoding="utf-8") as f_ind:
                         indice = json.load(f_ind)
