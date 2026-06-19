@@ -1648,63 +1648,101 @@ class JarvisApp(ctk.CTk):
         res = ctypes.windll.user32.MessageBoxW(0, mensaje, titulo, 4 | 0x30 | 0x40000)
         return res == 6 # Devuelve True si pulsa Sí
 
+    def registrar_app_en_indice(self, nombre, ruta):
+        """Registra una aplicación personalizada en indice.json de manera segura."""
+        try:
+            indice_path = r"C:\JARVIS2\indice.json"
+            if os.path.exists(indice_path):
+                with open(indice_path, "r", encoding="utf-8") as f:
+                    indice = json.load(f)
+            else:
+                indice = {"apps_uwp": {}, "apps_custom": {}}
+            
+            if "apps_custom" not in indice:
+                indice["apps_custom"] = {}
+                
+            indice["apps_custom"][nombre.lower()] = {"open": ruta}
+            
+            with open(indice_path, "w", encoding="utf-8") as f:
+                json.dump(indice, f, ensure_ascii=False, indent=2)
+            print(f"[WRAPPER] Guardado '{nombre.lower()}' con ruta '{ruta}' en indice.json")
+        except Exception as e:
+            print(f"[WRAPPER ERROR] No se pudo guardar en indice.json: {e}")
+
     def ejecutar_con_wrapper(self, code, lang, admin_on):
         """Wrapper de ejecución con timeout dinámico y clasificación de errores."""
         code_lower = code.lower()
         
         # Interceptador de aplicaciones conocidas en indice.json para evitar la búsqueda lenta o fallida
-        if lang != "python" and "es.exe" in code_lower:
+        is_es_search = False
+        if lang != "python":
+            if "es.exe" in code_lower or re.search(r'\b(?:es\.exe|es)\s+', code_lower):
+                is_es_search = True
+
+        if lang != "python" and is_es_search:
             try:
-                indice_path = r"C:\JARVIS2\indice.json"
-                if os.path.exists(indice_path):
-                    with open(indice_path, "r", encoding="utf-8") as f_ind:
-                        indice = json.load(f_ind)
-                    
-                    # 1. Extraer y normalizar el término de búsqueda de es.exe
-                    import re
-                    # Quitar es.exe al inicio
+                # 1. Extraer y normalizar el término de búsqueda de es.exe o es
+                import re
+                match_es = re.search(r'\b(?:es\.exe|es)\s+["\']?([^"\n\r]+)["\']?', code, flags=re.IGNORECASE)
+                if match_es:
+                    term = match_es.group(1).strip()
+                else:
                     term = re.sub(r'^(powershell\s+|python\s+)?(es\.exe|es)\s+', '', code, flags=re.IGNORECASE)
-                    term = re.sub(r'\.(lnk|exe|app|com|bat)\b', '', term, flags=re.IGNORECASE)
-                    nombre_normalizado = term.replace("*", "").replace("\"", "").replace("'", "").strip().lower()
+                term = re.sub(r'\.(lnk|exe|app|com|bat)\b', '', term, flags=re.IGNORECASE)
+                nombre_normalizado = term.replace("*", "").replace("\"", "").replace("'", "").strip().lower()
+                
+                # Quitar "abre", "abre el", "abre la" al principio del término normalizado
+                prefixes = ["abre el ", "abre la ", "abre "]
+                for prefix in prefixes:
+                    if nombre_normalizado.startswith(prefix):
+                        nombre_normalizado = nombre_normalizado[len(prefix):].strip()
+                        break
+                
+                if nombre_normalizado:
+                    indice_path = r"C:\JARVIS2\indice.json"
+                    if os.path.exists(indice_path):
+                        with open(indice_path, "r", encoding="utf-8") as f_ind:
+                            indice = json.load(f_ind)
+                    else:
+                        indice = {"apps_uwp": {}, "apps_custom": {}}
                     
-                    if nombre_normalizado:
-                        uwp_data = None
-                        custom_data = None
-                        matched_key = None
-                        
-                        uwp_dict = indice.get("apps_uwp", {})
-                        custom_dict = indice.get("apps_custom", {})
-                        
-                        # A. Buscar coincidencia exacta
-                        if nombre_normalizado in uwp_dict:
-                            uwp_data = uwp_dict[nombre_normalizado]
-                            matched_key = nombre_normalizado
-                        elif nombre_normalizado in custom_dict:
-                            custom_data = custom_dict[nombre_normalizado]
-                            matched_key = nombre_normalizado
-                        
-                        # B. Búsqueda difusa/aproximada en claves (clave contenida o continente)
-                        if not uwp_data and not custom_data:
-                            for clave in uwp_dict:
+                    uwp_data = None
+                    custom_data = None
+                    matched_key = None
+                    
+                    uwp_dict = indice.get("apps_uwp", {})
+                    custom_dict = indice.get("apps_custom", {})
+                    
+                    # A. Buscar coincidencia exacta
+                    if nombre_normalizado in uwp_dict:
+                        uwp_data = uwp_dict[nombre_normalizado]
+                        matched_key = nombre_normalizado
+                    elif nombre_normalizado in custom_dict:
+                        custom_data = custom_dict[nombre_normalizado]
+                        matched_key = nombre_normalizado
+                    
+                    # B. Búsqueda difusa/aproximada
+                    if not uwp_data and not custom_data:
+                        for clave in uwp_dict:
+                            if clave in nombre_normalizado or nombre_normalizado in clave:
+                                uwp_data = uwp_dict[clave]
+                                matched_key = clave
+                                break
+                        if not uwp_data:
+                            for clave in custom_dict:
                                 if clave in nombre_normalizado or nombre_normalizado in clave:
-                                    uwp_data = uwp_dict[clave]
+                                    custom_data = custom_dict[clave]
                                     matched_key = clave
                                     break
-                            if not uwp_data:
-                                for clave in custom_dict:
-                                    if clave in nombre_normalizado or nombre_normalizado in clave:
-                                        custom_data = custom_dict[clave]
-                                        matched_key = clave
-                                        break
-                        
-                        # C. Redirigir el código de ejecución si hubo coincidencia
+                    
+                    # Si existe coincidencia en el índice -> Lanzamiento directo
+                    if matched_key:
                         target_data = uwp_data if uwp_data else custom_data
-                        if target_data:
-                            open_path = target_data.get("open")
-                            close_title = target_data.get("close_title")
-                            if open_path:
-                                if close_title:
-                                    code = f'''
+                        open_path = target_data.get("open")
+                        close_title = target_data.get("close_title")
+                        if open_path:
+                            if close_title:
+                                code = f'''
 $ya_abierto = Get-Process | Where-Object {{$_.MainWindowTitle -like "*{close_title}*"}} | Select-Object -First 1
 if ($ya_abierto -and $ya_abierto.MainWindowHandle -ne 0) {{
     Add-Type @"
@@ -1722,12 +1760,99 @@ if ($ya_abierto -and $ya_abierto.MainWindowHandle -ne 0) {{
     Write-Output "{matched_key} lanzado correctamente."
 }}
 '''
-                                else:
-                                    code = f'Start-Process "{open_path}"'
+                            else:
+                                code = f'Start-Process "{open_path}"'
+                            code_lower = code.lower()
+                            print(f"[WRAPPER] Interceptado '{nombre_normalizado}' (match '{matched_key}'). Redirigiendo a lanzamiento directo.")
+                    else:
+                        # Si no existe coincidencia -> buscar con es.exe
+                        print(f"[WRAPPER] '{nombre_normalizado}' no está en indice.json. Buscando en el sistema con es.exe...")
+                        
+                        # Ejecutar es.exe y capturar salida
+                        res_es = subprocess.run(["es.exe", nombre_normalizado], capture_output=True, text=True, encoding="utf-8", errors="replace")
+                        es_output = res_es.stdout
+                        
+                        lines = [line.strip() for line in es_output.splitlines() if line.strip()]
+                        valid_results = []
+                        for line in lines:
+                            if line.lower().endswith(('.exe', '.lnk', '.bat', '.cmd', '.ps1')):
+                                valid_results.append(line)
+                                
+                        if len(valid_results) == 1:
+                            # 1 resultado -> abrir directamente y registrar
+                            path_to_open = valid_results[0]
+                            print(f"[WRAPPER] 1 resultado encontrado: '{path_to_open}'. Registrando y abriendo.")
+                            self.registrar_app_en_indice(nombre_normalizado, path_to_open)
+                            
+                            # Generar código para ejecutar en PowerShell
+                            code = f'Start-Process "{path_to_open}"'
+                            code_lower = code.lower()
+                            
+                        elif len(valid_results) > 1:
+                            # Más de 1 resultado -> mostrar lista numerada
+                            print(f"[WRAPPER] Varios resultados encontrados. Mostrando popup de elección.")
+                            choice_event = threading.Event()
+                            choice_result = [None]
+                            
+                            def set_choice(val):
+                                choice_result[0] = val
+                                choice_event.set()
+                                
+                            self.ui_queue.put(("popup_eleccion", (nombre_normalizado, valid_results, set_choice)))
+                            
+                            # Esperar a que el usuario elija
+                            choice_event.wait()
+                            selected_path = choice_result[0]
+                            
+                            if selected_path:
+                                print(f"[WRAPPER] El usuario seleccionó: '{selected_path}'. Registrando y abriendo.")
+                                self.registrar_app_en_indice(nombre_normalizado, selected_path)
+                                code = f'Start-Process "{selected_path}"'
                                 code_lower = code.lower()
-                                print(f"[WRAPPER] Interceptado '{nombre_normalizado}' (match '{matched_key}'). Redirigiendo a lanzamiento directo.")
+                            else:
+                                # Cancelado o cerrado
+                                return "OK", f"Búsqueda de {nombre_normalizado} cancelada por el usuario."
+                                
+                        else:
+                            # 0 resultados -> mostrar mensaje y parar
+                            msg = f"No he encontrado {nombre_normalizado} en el sistema."
+                            print(f"[WRAPPER] {msg}")
+                            # Imprimir directamente en chat para feedback inmediato al usuario
+                            self.ui_queue.put(("chat", f"\n[JARVIS] {msg}\n"))
+                            # Devolver al LLM para que finalice
+                            return "OK", msg
             except Exception as e_ind:
-                print(f"[WRAPPER ERROR] No se pudo procesar abrir desde indice.json: {e_ind}")
+                print(f"[WRAPPER ERROR] Error en flujo es.exe: {e_ind}")
+
+        # Interceptador de Start-Process para registro automático
+        if lang != "python" and "start-process" in code_lower:
+            try:
+                # Extraer la ruta del comando Start-Process
+                import re
+                match_sp = re.search(r'start-process\s+(?:-filepath\s+)?["\']?([^"\']+\.(?:exe|lnk|bat|cmd|ps1))["\']?', code, flags=re.IGNORECASE)
+                if match_sp:
+                    ruta_manual = match_sp.group(1).strip()
+                    # Extraer basename sin extensión
+                    basename = os.path.basename(ruta_manual)
+                    nombre_app, _ = os.path.splitext(basename)
+                    nombre_app = nombre_app.lower()
+                    
+                    # Registrar en indice.json si no está ya
+                    indice_path = r"C:\JARVIS2\indice.json"
+                    existe_ya = False
+                    if os.path.exists(indice_path):
+                        with open(indice_path, "r", encoding="utf-8") as f_ind:
+                            indice = json.load(f_ind)
+                        uwp_dict = indice.get("apps_uwp", {})
+                        custom_dict = indice.get("apps_custom", {})
+                        if nombre_app in uwp_dict or nombre_app in custom_dict:
+                            existe_ya = True
+                    
+                    if not existe_ya:
+                        print(f"[WRAPPER] Detectado Start-Process manual de '{ruta_manual}'. Registrando automáticamente como '{nombre_app}'...")
+                        self.registrar_app_en_indice(nombre_app, ruta_manual)
+            except Exception as e_sp:
+                print(f"[WRAPPER ERROR] Error al autoregistrar app en Start-Process: {e_sp}")
 
         # Interceptador de cierre de aplicaciones en indice.json para evitar errores
         if lang != "python" and ("stop-process" in code_lower or "stopprocess" in code_lower):
@@ -1985,6 +2110,66 @@ if ($proc -and $proc.MainWindowHandle -ne 0) {{
 
                     btn_cancel = ctk.CTkButton(btn_frame, text="❌ Cancelar (Voz: No)", command=on_cancel, fg_color="red", hover_color="darkred")
                     btn_cancel.pack(side="left", padx=20)
+
+                elif tipo == "popup_eleccion":
+                    nombre_normalizado, opciones, callback = valor
+                    popup = ctk.CTkToplevel(self)
+                    popup.title("Selección de Aplicación")
+                    popup.geometry("550x380")
+                    popup.attributes("-topmost", True)
+                    
+                    # Centrar el popup
+                    popup.update_idletasks()
+                    x = (popup.winfo_screenwidth() // 2) - (550 // 2)
+                    y = (popup.winfo_screenheight() // 2) - (380 // 2)
+                    popup.geometry(f"550x380+{x}+{y}")
+
+                    lbl = ctk.CTkLabel(
+                        popup, 
+                        text=f"He encontrado varias opciones para '{nombre_normalizado}':\n¿Cuál quieres abrir?", 
+                        wraplength=500, 
+                        font=ctk.CTkFont(size=14, weight="bold")
+                    )
+                    lbl.pack(pady=15)
+
+                    scroll_frame = ctk.CTkScrollableFrame(popup, width=500, height=220)
+                    scroll_frame.pack(padx=15, fill="both", expand=True)
+
+                    def select_item(p):
+                        popup.destroy()
+                        callback(p)
+
+                    def on_close():
+                        popup.destroy()
+                        callback(None)
+
+                    popup.protocol("WM_DELETE_WINDOW", on_close)
+
+                    for idx, path in enumerate(opciones, 1):
+                        item_frame = ctk.CTkFrame(scroll_frame, fg_color="transparent")
+                        item_frame.pack(pady=3, fill="x")
+                        
+                        btn = ctk.CTkButton(
+                            item_frame, 
+                            text=f"{idx}. {path}", 
+                            anchor="w",
+                            command=lambda p=path: select_item(p),
+                            fg_color=("#F0F0F0", "#2B2B2B"),
+                            text_color=("black", "white"),
+                            hover_color=("#D3D3D3", "#3A3A3A")
+                        )
+                        btn.pack(fill="x", padx=5, pady=1)
+
+                    # Botón cancelar
+                    btn_cancel = ctk.CTkButton(
+                        popup,
+                        text="Cancelar",
+                        command=on_close,
+                        fg_color="red",
+                        hover_color="darkred",
+                        width=100
+                    )
+                    btn_cancel.pack(pady=10)
 
                 elif tipo == "estado":
                     if hasattr(self, 'lbl_estado'):
