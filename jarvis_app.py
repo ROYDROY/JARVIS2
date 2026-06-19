@@ -960,7 +960,7 @@ class JarvisApp(ctk.CTk):
                             lineas = [l.strip() for l in res.stdout.strip().splitlines() if l.strip().lower().endswith(f"\\{nombre_busqueda}.lnk")]
                             if lineas:
                                 ruta_lnk = lineas[0]
-                                subprocess.Popen(["cmd", "/c", "start", "", ruta_lnk], shell=False)
+                                os.startfile(ruta_lnk)
                                 return self._registrar_y_retornar_apertura(nombre, os.path.basename(ruta_lnk))
                         except Exception:
                             pass
@@ -985,7 +985,7 @@ class JarvisApp(ctk.CTk):
                                     lineas = [l.strip() for l in res.stdout.strip().splitlines() if l.strip().lower().endswith(f"\\{nombre_busqueda}.lnk")]
                                     if lineas:
                                         ruta_lnk = lineas[0]
-                                        subprocess.Popen(["cmd", "/c", "start", "", ruta_lnk], shell=False)
+                                        os.startfile(ruta_lnk)
                                         return self._registrar_y_retornar_apertura(nombre, os.path.basename(ruta_lnk))
                                 except Exception:
                                     pass
@@ -1037,7 +1037,7 @@ class JarvisApp(ctk.CTk):
             lineas = [l.strip() for l in res.stdout.strip().splitlines() if l.strip().lower().endswith(f"\\{nombre_lower}.lnk")]
             if lineas:
                 ruta_lnk = lineas[0]
-                subprocess.Popen(["cmd", "/c", "start", "", ruta_lnk], shell=False)
+                os.startfile(ruta_lnk)
                 return self._registrar_y_retornar_apertura(nombre, os.path.basename(ruta_lnk))
         except Exception:
             pass
@@ -1093,7 +1093,11 @@ class JarvisApp(ctk.CTk):
             )
             count = res_check.stdout.strip()
             if count == "0" or not count:
-                # Si es 0, remover de procesos_activos y retornar mensaje de error
+                # Si es un acceso directo .lnk, el proceso real del navegador/app puede diferir
+                # Por tanto, no declaramos fallo si el archivo de origen termina con .lnk
+                if default_proc.lower().endswith(".lnk"):
+                    return f"{nombre.capitalize()} abierta."
+                # Si es 0 y no es .lnk, remover de procesos_activos y retornar mensaje de error
                 self.procesos_activos.pop(nombre_lower, None)
                 return f"No he podido abrir {nombre}. Verifica que esté instalada."
         except Exception:
@@ -1119,10 +1123,11 @@ class JarvisApp(ctk.CTk):
                     target_data = cat_dict[nombre_lower]
                 else:
                     for key, val in cat_dict.items():
-                        if nombre_lower in key or key in nombre_lower:
+                        aliases = [a.lower() for a in val.get("nombres", [])]
+                        if nombre_lower in aliases:
                             target_data = val
                             break
-                
+                            
                 if target_data:
                     close_cmd = target_data.get("close_cmd")
                     close_title = target_data.get("close_title")
@@ -1173,10 +1178,16 @@ class JarvisApp(ctk.CTk):
             pass
 
         # 5. Fallback: buscar en lista de procesos activos del sistema por nombre parcial usando PowerShell
+        # MEJORA DE SEGURIDAD: si es de 2 o menos caracteres (como "x"), exigimos coincidencia exacta
         try:
+            if len(nombre_lower) <= 2:
+                filtro_close = f"$_.Name -eq '{nombre_lower}' -or $_.MainWindowTitle -eq '{nombre}'"
+            else:
+                filtro_close = f"$_.Name -like '*{nombre}*' -or $_.MainWindowTitle -like '*{nombre}*'"
+                
             res = subprocess.run(
                 ["powershell", "-NoProfile", "-Command",
-                 f"Get-Process | Where-Object {{$_.Name -like '*{nombre}*'}} | Stop-Process -Force"],
+                 f"Get-Process | Where-Object {{{filtro_close}}} | Stop-Process -Force"],
                 capture_output=True, text=True, timeout=10
             )
             if res.returncode == 0:
