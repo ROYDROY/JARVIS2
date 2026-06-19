@@ -1769,7 +1769,7 @@ if ($ya_abierto -and $ya_abierto.MainWindowHandle -ne 0) {{
                         print(f"[WRAPPER] '{nombre_normalizado}' no está en indice.json. Buscando en el sistema con es.exe...")
                         
                         # Ejecutar es.exe y capturar salida
-                        res_es = subprocess.run(["es.exe", nombre_normalizado], capture_output=True, text=True, encoding="utf-8", errors="replace")
+                        res_es = subprocess.run([r"C:\JARVIS2\herramientas\es.exe", nombre_normalizado], capture_output=True, text=True, encoding="utf-8", errors="replace")
                         es_output = res_es.stdout
                         
                         lines = [line.strip() for line in es_output.splitlines() if line.strip()]
