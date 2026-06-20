@@ -4,7 +4,7 @@ import urllib.request
 import re
 import yaml
 
-ROOT = r"C:\JARVIS2"
+ROOT = os.path.dirname(os.path.abspath(__file__))
 LOG_PATH = os.path.join(ROOT, "logs", "sesion_actual.log")
 MEMORIA_PATH = os.path.join(ROOT, "memoria", "memoria.json")
 

@@ -9,7 +9,8 @@ import yaml
 from datetime import datetime
 from interpreter import interpreter
 
-LOG_PROACTIVO = r"C:\JARVIS2\logs\proactivo.log"
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+LOG_PROACTIVO = os.path.join(BASE_DIR, "logs", "proactivo.log")
 os.makedirs(os.path.dirname(LOG_PROACTIVO), exist_ok=True)
 
 def log(content):
@@ -43,13 +44,13 @@ def main():
 
     # Cargar configuracion base
     try:
-        system_msg = open(r"C:\JARVIS2\system.md", "r", encoding="utf-8-sig").read()
+        system_msg = open(os.path.join(BASE_DIR, "system.md"), "r", encoding="utf-8-sig").read()
         interpreter.system_message = system_msg + "\n\nESTAS EJECUTANDOTE EN SEGUNDO PLANO (MODO PROACTIVO). NO HABLES CON EL USUARIO, NO HAGAS PREGUNTAS. SIMPLEMENTE HAZ LA TAREA, GUARDA EL RESULTADO DONDE SE INDIQUE Y CIÉRRATE."
     except Exception as e:
         log(f"[ERROR] No se pudo leer system.md: {e}")
         sys.exit(1)
 
-    CONFIG_PATH = r"C:\JARVIS2\config.yaml"
+    CONFIG_PATH = os.path.join(BASE_DIR, "config.yaml")
     try:
         with open(CONFIG_PATH, "r", encoding="utf-8-sig") as f:
             config_data = yaml.safe_load(f)
@@ -75,7 +76,7 @@ def main():
     try:
         import chromadb
         from chromadb.utils import embedding_functions
-        chroma_client = chromadb.PersistentClient(path=r"C:\JARVIS2\vector_db")
+        chroma_client = chromadb.PersistentClient(path=os.path.join(BASE_DIR, "vector_db"))
         ollama_ef = embedding_functions.OllamaEmbeddingFunction(
             url="http://localhost:11434/api/embeddings", 
             model_name="nomic-embed-text"
