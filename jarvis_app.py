@@ -2211,37 +2211,14 @@ if ($ya_abierto -and $ya_abierto.MainWindowHandle -ne 0) {{
             except Exception as e_ind:
                 print(f"[WRAPPER ERROR] Error en flujo es.exe: {e_ind}")
 
-        # Interceptador de Start-Process para registro automático
+        # --- ENDURECIMIENTO: Validación de comandos del LLM ---
+        import re
         if lang != "python" and "start-process" in code_lower:
-            try:
-                # Extraer la ruta del comando Start-Process
-                import re
-                match_sp = re.search(r'start-process\s+(?:-filepath\s+)?["\']?([^"\']+\.(?:exe|lnk|bat|cmd|ps1))["\']?', code, flags=re.IGNORECASE)
-                if match_sp:
-                    ruta_manual = match_sp.group(1).strip()
-                    # Extraer basename sin extensión
-                    basename = os.path.basename(ruta_manual)
-                    nombre_app, _ = os.path.splitext(basename)
-                    nombre_app = nombre_app.lower()
-                    
-                    # Registrar en indice.json si no está ya
-                    indice_path = os.path.join(BASE_DIR, "indice.json")
-                    existe_ya = False
-                    if os.path.exists(indice_path):
-                        with open(indice_path, "r", encoding="utf-8") as f_ind:
-                            indice = json.load(f_ind)
-                        uwp_dict = indice.get("apps_uwp", {})
-                        custom_dict = indice.get("apps_custom", {})
-                        if nombre_app in uwp_dict or nombre_app in custom_dict:
-                            existe_ya = True
-                    
-                    if not existe_ya:
-                        print(f"[WRAPPER] Detectado Start-Process manual de '{ruta_manual}'. Registrando automáticamente como '{nombre_app}'...")
-                        self.registrar_app_en_indice(nombre_app, ruta_manual)
-                    
-                    self.procesos_activos[nombre_app.lower()] = True
-            except Exception as e_sp:
-                print(f"[WRAPPER ERROR] Error al autoregistrar app en Start-Process: {e_sp}")
+            if "c:\\" in code_lower or re.search(r'[a-zA-Z]:\\', code_lower) or "shell:appsfolder" in code_lower:
+                msg = "No he podido ejecutar esa orden correctamente."
+                print("[WRAPPER LOG] Comando inválido del LLM detectado y bloqueado (Start-Process directo).")
+                self.ui_queue.put(("chat", f"\n[JARVIS] {msg}\n"))
+                return "ERROR_VALIDACION", msg
 
         # Interceptador de cierre de aplicaciones en indice.json para evitar errores
         if lang != "python" and ("stop-process" in code_lower or "stopprocess" in code_lower):
