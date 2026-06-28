@@ -1,0 +1,24 @@
+Actúas como un Ingeniero de Sistemas y Arquitecto de Software Senior, experto en Python, integración de LLMs (ReAct) y automatización profunda en entornos Windows (procesos asíncronos, Job Objects, manejo de hilos y consola).
+
+Te traigo el código de **JARVIS 4.0**, un asistente local (Open Interpreter + Qwen 2.5 Coder) integrado en un bucle ReAct. 
+
+### CONTEXTO DEL PROYECTO Y ARQUITECTURA
+- **Core:** Un script en Python (ej. `jarvis_app.py`) con una UI en CustomTkinter.
+- **Flujo ReAct:** El LLM genera bloques de código en markdown (Python o PowerShell). El script intercepta esos bloques, los ejecuta de forma silenciosa, y devuelve el output de la terminal al LLM para que evalúe si ha logrado su objetivo.
+- **Cierre de tarea:** Cuando el LLM considera que ha terminado, debe imprimir la etiqueta `[TAREA_COMPLETADA]`.
+
+### EL PROBLEMA: ESTAMOS ATASCADOS
+Tenemos múltiples cuellos de botella en la interacción entre el script de Python, los LLMs y el sistema operativo Windows. Históricamente nos enfrentamos a estos 4 grandes problemas, y necesitamos tu ayuda para auditar el código y desatascarnos definitivamente:
+
+1. **El Bug del Bucle Infinito (Condición de Carrera LLM):** Si el LLM imprime el código a ejecutar y la etiqueta `[TAREA_COMPLETADA]` en el mismo mensaje de respuesta, el script suele abortar y cerrar la tarea antes de llegar a ejecutar el código. Necesitamos que el parseo garantice que el código siempre se evalúa y ejecuta PRIMERO, y que la etiqueta de completado se procesa DESPUÉS (o en el siguiente turno con el output).
+2. **Asincronía en Windows (GUI vs Consola):** Cuando el LLM lanza comandos PowerShell que invocan GUIs (ej. `WinRAR.exe` con `&`), Windows lo lanza asíncronamente. El script de Python cree que ya ha terminado, avanza, y borra temporales antes de que la acción real acabe.
+3. **Herencia Venenosa (Job Objects):** Al lanzar procesos de larga duración (ej. servidores locales o apps como MS Office) desde el script Python, heredan el Job Object. Si el script padre se detiene o avanza, Windows asesina a los hijos.
+4. **Pérdida de contexto / Alucinaciones:** Si falla un comando o se pierde una variable temporal, el LLM tiende a entrar en bucles de alucinación intentando inventar rutas en lugar de auditar el entorno.
+
+### TU MISIÓN
+Voy a adjuntarte el código fuente actual del proyecto. Quiero que:
+1. Audites el bucle principal de ejecución y el parseador (regex) para solucionar de forma definitiva el problema de `[TAREA_COMPLETADA]` coexistiendo con bloques de código.
+2. Propongas mecanismos a nivel de código Python (o directivas estrictas para el prompt del sistema del LLM) para aislar procesos en Windows (romper el Job Object) y forzar la sincronía de comandos PowerShell cuando sea necesario.
+3. Hagas los cambios con "bisturí": modifica solo la lógica necesaria para solucionar esto. No reescribas la UI ni cambies la arquitectura base.
+
+Dime por dónde empezamos y muéstrame las correcciones de código exactas.
