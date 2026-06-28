@@ -1,0 +1,33 @@
+Eres un Agente de IA experto en debugging de Python y Open Interpreter. Tu tarea es reparar el código de **JARVIS 4.0**, un asistente virtual local.
+
+**PASO CERO:** Lo primero que debes hacer es importar/clonar el repositorio del paciente desde `https://github.com/ROYDROY/JARVIS2.git` si el usuario no te lo ha cargado ya en el workspace de Replit. Todo el código fuente está ahí.
+
+**PRESUPUESTO ESTRICTO:** Tienes un límite máximo de $16 en la cuenta. NO hagas refactorizaciones masivas, no entres en bucles infinitos de prueba y error, y detente inmediatamente si la reparación no es trivial para pedir feedback al usuario. Sé quirúrgico.
+
+### ¿Qué es JARVIS y cómo funciona?
+- Está construido sobre **Open Interpreter** y una envoltura pesada en Python (`jarvis_app.py`).
+- Usa **LiteLLM** para enrutar peticiones a modelos (principalmente `gemini-2.5-flash` o `Llama-3.1` vía NVIDIA NIM).
+- Tiene un sistema de "Hardening" y un **Interceptor OS** (`_manejar_interceptores_os`) diseñado para capturar intenciones del usuario de forma rápida (ej. abrir aplicaciones o buscar cosas) sin gastar tokens de IA.
+
+### ¿Qué le pasa al paciente? (Bugs actuales a reparar)
+
+**1. Problema de Autenticación con Gemini (Error 400)**
+- Al intentar usar `gemini-2.5-flash` mediante LiteLLM, el sistema crashea con este traceback:
+  `litellm.exceptions.AuthenticationError: Vertex_ai_betaException - API key not valid. Please pass a valid API key.`
+- **Tu tarea:** Revisa cómo se están cargando las variables de entorno en `jarvis_app.py` o en el archivo principal y cómo se le pasan a `interpreter.llm.api_key`. Hay que asegurar que la API key se lee correctamente y el proveedor está bien configurado para Gemini.
+
+**2. Fallo de Formato del Parser (Al usar NVIDIA NIM / Llama-3.1)**
+- Cuando el sistema cambia a usar la API de NVIDIA NIM, *la conexión sí funciona*, pero el LLM genera las etiquetas de código mal formateadas, escribiendo la etiqueta de lenguaje y un comando juntos en la misma línea, por ejemplo: ` ```powershell powershell_run `
+- Esto hace que el parser interno lea `powershell_run` como si fuera la primera línea de código, y al ejecutarlo salta el error: `El término 'powershell_run' no se reconoce como un cmdlet`.
+- **Tu tarea:** Revisar cómo se le inyectan las instrucciones base (System Prompt) a la IA. Hay que forzar al modelo a que escriba correctamente los bloques de código (solo ````powershell`) sin inyectar basura en la declaración del lenguaje.
+
+**3. Alucinación del Bucle ReAct y `[TAREA_COMPLETADA]`**
+- Tras fallar la ejecución del código (por culpa del fallo del parser mencionado arriba), el modelo de NVIDIA empieza a alucinar la salida de la consola por su cuenta. Escribe texto plano diciendo cosas como *"Análisis de los resultados... Corrección del código... [TAREA_COMPLETADA]"* en lugar de detenerse y esperar el output de la terminal.
+- **Tu tarea:** Ajustar el control del bucle en Open Interpreter o el prompt para que el modelo entienda que NO debe simular las respuestas ni autocompletar la ejecución, sino detenerse a esperar que la computadora le devuelva el output real.
+
+**4. Falsos Positivos del Interceptor OS (Fast-Track)**
+- El sistema tiene un "Fast-Track" (`Interceptor OS`) que intercepta expresiones para abrir programas. Actualmente es demasiado agresivo.
+- Si el usuario dice *"pues ejecuta esas acciones"* o *"activarte a la vez"*, el Interceptor cree que el usuario quiere abrir un programa llamado "esas acciones" o "activarte", fallando rotundamente.
+- **Tu tarea:** Refinar la lógica o las expresiones regulares del Interceptor OS en `jarvis_app.py` para que solo salte con comandos explícitos de abrir aplicaciones (ej. "abre discord", "lanza chrome") y deje pasar el resto de la conversación al LLM.
+
+**REGLA FINAL:** Lee el código actual, identifica los puntos de fallo exactos en `jarvis_app.py` u otros módulos, y aplica las correcciones mínimas necesarias para solucionar estos 4 problemas. Si ves que el presupuesto peligra, para y consulta.
