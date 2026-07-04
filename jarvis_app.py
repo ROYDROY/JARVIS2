@@ -81,35 +81,73 @@ except Exception:
     TEMP_CHAT = 0.7
     ES_MULTIPLE = "auto_exe"
 
+API_REGISTRY = {
+    "GEMINI": {
+        "key": "GEMINI_API_KEY",
+        "desc": "Visión avanzada, contexto masivo y análisis profundo de datos.",
+        "color": "#1A73E8",
+        "models": {
+            "Ingeniero": "gemini/gemini-2.5-pro",
+            "Análisis": "gemini/gemini-2.5-pro",
+            "Conversación": "gemini/gemini-2.5-flash"
+        },
+        "scores": {"Ingeniero": 100, "Análisis": 100, "Conversación": 80}
+    },
+    "OPENAI": {
+        "key": "OPENAI_API_KEY",
+        "desc": "Modelos GPT-4. Excelentes para razonamiento lógico y código complejo.",
+        "color": "#10A37F",
+        "models": {
+            "Ingeniero": "openai/gpt-4o",
+            "Análisis": "openai/gpt-4o",
+            "Conversación": "openai/gpt-4o-mini"
+        },
+        "scores": {"Ingeniero": 90, "Análisis": 90, "Conversación": 75}
+    },
+    "ANTHROPIC": {
+        "key": "ANTHROPIC_API_KEY",
+        "desc": "Familia Claude 3. Excelente para escritura, redacción y refactorización.",
+        "color": "#D97757",
+        "models": {
+            "Ingeniero": "anthropic/claude-3-5-sonnet-20240620",
+            "Análisis": "anthropic/claude-3-5-sonnet-20240620",
+            "Conversación": "anthropic/claude-3-5-haiku-20241022"
+        },
+        "scores": {"Ingeniero": 95, "Análisis": 95, "Conversación": 70}
+    },
+    "GROQ": {
+        "key": "GROQ_API_KEY",
+        "desc": "Inferencia ultrarrápida. Ideal para mantener charlas en tiempo real.",
+        "color": "#F55036",
+        "models": {
+            "Ingeniero": "groq/llama3-70b-8192",
+            "Análisis": "groq/llama3-70b-8192",
+            "Conversación": "groq/llama3-70b-8192"
+        },
+        "scores": {"Ingeniero": 40, "Análisis": 50, "Conversación": 100}
+    }
+}
+
 def seleccionar_cerebro(prompt, modo="Automático"):
     prompt_lower = prompt.lower()
-    
-    # Detectar APIs activas en el entorno
-    has_gemini = bool(os.getenv("GEMINI_API_KEY"))
-    has_openai = bool(os.getenv("OPENAI_API_KEY"))
-    has_anthropic = bool(os.getenv("ANTHROPIC_API_KEY"))
-    has_groq = bool(os.getenv("GROQ_API_KEY"))
     
     # Detectar si hay un archivo adjunto en el prompt
     tiene_archivo = "[Archivo:" in prompt
     tiene_imagen = False
     if tiene_archivo:
-        # Detectar extensiones comunes de imagen en la ruta
         tiene_imagen = any(ext in prompt_lower for ext in [".jpg", ".jpeg", ".png", ".webp", ".bmp", ".gif"])
     
     # Identificar tarea en modo Automático
     es_codigo = False
     es_analisis = False
-    es_autonomo = False  # NUEVO: tareas que requieren ejecución real + escritura de archivos
+    es_autonomo = False
     
     if modo == "Automático":
         if tiene_imagen:
             es_analisis = True
         elif tiene_archivo:
-            # Si tiene otro archivo no imagen, requiere ingeniería (leer pdf/excel/zip, etc.)
             es_codigo = True
         else:
-            # Tareas autónomas pesadas: análisis del sistema, informes, auditorías
             keywords_autonomo = ["audita", "analiza el pc", "analiza el ordenador", "analiza mi pc", "analiza mi ordenador",
                                  "genera un informe", "crea un informe", "escribe un informe",
                                  "investiga el", "diagnóstico", "diagnostico", "examina el sistema",
@@ -131,10 +169,21 @@ def seleccionar_cerebro(prompt, modo="Automático"):
                     if any(k in prompt_lower for k in keywords_analisis):
                         es_analisis = True
 
-    # === RANKING DINÁMICO POR ROLES ===
-    
+    # Determinar el rol/categoría final
+    rol = "Conversación"
+    if modo == "Ingeniero" or es_codigo or es_autonomo:
+        rol = "Ingeniero"
+    elif modo == "Análisis" or es_analisis:
+        rol = "Análisis"
+    elif modo == "Conversación":
+        rol = "Conversación"
+        
+    # Forzar un modelo específico si el modo empieza con "Forzar: "
     if modo.startswith("Forzar: "):
         nombre_api = modo.replace("Forzar: ", "").strip()
+        if nombre_api in API_REGISTRY:
+            return API_REGISTRY[nombre_api]["models"].get(rol, f"{nombre_api.lower()}/auto")
+        
         diccionario_modelos = {
             "NVIDIA": "nvidia_nim/meta/llama3-70b-instruct",
             "MISTRAL": "mistral/mistral-large-latest",
@@ -143,29 +192,25 @@ def seleccionar_cerebro(prompt, modo="Automático"):
             "OPENROUTER": "openrouter/auto"
         }
         return diccionario_modelos.get(nombre_api, f"{nombre_api.lower()}/auto")
-    
-    # NIVEL 3 - Tareas autónomas complejas: Local potente primero, nube como red de seguridad
-    if es_autonomo:
-        return MODEL_CODER 
-    
-    if modo == "Ingeniero" or es_codigo:
-        if has_openai: return "openai/gpt-4o"
-        if has_anthropic: return "anthropic/claude-3-5-sonnet-20240620"
+
+    # Selección Dinámica cruzando APIs activas con scores
+    mejores_apis = []
+    for api_name, info in API_REGISTRY.items():
+        if os.getenv(info["key"]):
+            score = info["scores"].get(rol, 0)
+            mejores_apis.append((api_name, score))
+            
+    if mejores_apis:
+        mejores_apis.sort(key=lambda x: x[1], reverse=True)
+        mejor_api_name = mejores_apis[0][0]
+        return API_REGISTRY[mejor_api_name]["models"][rol]
+
+    # Fallback Local (Ollama/LM Studio)
+    if rol == "Ingeniero" or es_autonomo:
         return MODEL_CODER
-        
-    elif modo == "Análisis" or es_analisis:
-        if has_gemini: return "gemini/gemini-2.5-flash"
-        if has_anthropic: return "anthropic/claude-3-5-sonnet-20240620"
-        if has_openai: return "openai/gpt-4o"
-        return MODEL_CODER
-        
-    elif modo == "Conversación":
-        # Evitar bypass de charla cuando hay archivos que procesar
-        if not tiene_archivo and has_groq: return "groq/llama3-70b-8192"
+    else:
         return MODEL_CHAT
-        
-    # Defecto: charla ligera local
-    return MODEL_CHAT
+
 
 # ==============================================================================
 # CLASE PRINCIPAL GUI
@@ -718,13 +763,15 @@ class JarvisApp(ctk.CTk):
             popup_window.destroy()
             self.abrir_gestor_apis()
 
-        apis_base = ["GEMINI_API_KEY", "OPENAI_API_KEY", "ANTHROPIC_API_KEY", "GROQ_API_KEY"]
-        apis = [
-            {"nombre": "GEMINI", "env": "GEMINI_API_KEY", "desc": "Visión avanzada, contexto masivo y análisis profundo de datos.", "color": "#1A73E8"},
-            {"nombre": "OPENAI", "env": "OPENAI_API_KEY", "desc": "Modelos GPT-4. Excelentes para razonamiento lógico y código complejo.", "color": "#10A37F"},
-            {"nombre": "ANTHROPIC", "env": "ANTHROPIC_API_KEY", "desc": "Familia Claude 3. Excelente para escritura, redacción y refactorización.", "color": "#D97757"},
-            {"nombre": "GROQ", "env": "GROQ_API_KEY", "desc": "Inferencia ultrarrápida. Ideal para mantener charlas en tiempo real.", "color": "#F55036"}
-        ]
+        apis_base = [info["key"] for info in API_REGISTRY.values()]
+        apis = []
+        for api_name, info in API_REGISTRY.items():
+            apis.append({
+                "nombre": api_name,
+                "env": info["key"],
+                "desc": info["desc"],
+                "color": info["color"]
+            })
         
         # Detectar APIs personalizadas
         for k in os.environ.keys():
