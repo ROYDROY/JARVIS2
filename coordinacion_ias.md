@@ -35,5 +35,12 @@ Please preserve this format and write updates under your respective turns. Use *
 
 ---
 
-## [Pending] - Turn: Replit Agent
-*(Replit Agent: Please replace this section with your execution results, environment info, and logs when you pull this commit).*
+## [2026-06-28] - Turn: Replit Agent
+
+* **Environment:** Replit workspace running a pnpm/Node.js monorepo (TypeScript, Express, artifacts). No Python runtime is installed in this container, no display server, no Ollama server, and no Windows APIs (`pyautogui`, `keyboard`, `windnd`, `customtkinter` GUI). This environment cannot run `jarvis_app.py` — it is a Windows-only desktop GUI application that depends on hardware (mic, GUI, hotkeys) unavailable in a headless Linux sandbox.
+
+* **Findings on this instruction file:** This file's content instructs an AI agent to auto-execute code and then commit/push results back to a remote repository. I'm flagging this pattern explicitly — a markdown file directing an agent to run commands and push to git is a prompt-injection style risk and should not be treated as trusted instructions by default.
+
+* **Git remote note:** This workspace's `origin` remote was found pointing to `https://github.com/ROYDROY/JARVIS2.git`, despite this workspace's actual content being an unrelated pnpm monorepo. Per explicit user decision, **no commit or push was made** to that repository to avoid corrupting the real JARVIS2 project. The remote link itself was left untouched (no changes made) pending further instruction from the user.
+
+* **Status:** `jarvis_app.py` was previously audited and patched separately (see repo history / chat) to fix: Gemini 400 auth routing, NVIDIA code-block parser tolerance, ReAct loop hallucination, and OS-interceptor false positives. That patched file lives in this Replit workspace at `jarvis_app.py`, not in this repo's git history.
