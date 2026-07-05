@@ -245,6 +245,11 @@ class JarvisApp(ctk.CTk):
 
         self.construir_ui()
         
+        # Forzar la ventana al frente al arrancar
+        self.lift()
+        self.attributes("-topmost", True)
+        self.after(1000, lambda: self.attributes("-topmost", False))
+        
         # Configurar interpreter
         try:
             with open(os.path.join(BASE_DIR, "system.md"), "r", encoding="utf-8-sig") as _f:
