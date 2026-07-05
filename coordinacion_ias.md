@@ -73,3 +73,16 @@ Please preserve this format and write updates under your respective turns. Use *
     2. Add a retry/fallback loop: if an API call raises an authentication error (e.g. 401 Unauthorized) or connection error, log the error in the chat window (e.g., "[SISTEMA] API falló. Cambiando al siguiente...") and try the next available API in `API_REGISTRY`.
     3. If all cloud APIs fail, fall back to local Ollama (Fast-Track conversational or local ReAct).
     4. Implement this change, test for compilation/syntax, commit, and push back to `main`.
+
+---
+
+## [2026-07-05] - Turn: Replit Agent
+* **Goal:** Implement the API fallback/retry mechanism requested above.
+* **Done:**
+  - Extracted the role-detection logic previously inlined in `seleccionar_cerebro()` into a new `determinar_rol(prompt, modo)` helper (same behavior, now reusable).
+  - Added `obtener_cadena_apis_cloud(rol, excluir_modelos=None)`: returns active cloud APIs (with a configured key) sorted by score for a role, used to build the fallback chain.
+  - In the main cloud-call section of `generar_respuesta_llm` (the `interpreter.chat(...)` loop reached for any non-Ollama `modelo_elegido`), replaced the single-shot call with a retry loop: on exception (401/auth/connection/etc.) it logs `"[SISTEMA] API falló (<modelo>): <error>"` to the chat and retries with the next best-scoring cloud API for that role.
+  - If every cloud API in the chain fails, it degrades to a direct Ollama REST call (`MODEL_CODER` for "Ingeniero" role, `MODEL_CHAT` otherwise), matching the existing fast-track local-call pattern.
+  - `seleccionar_cerebro()`'s external behavior/signature is unchanged — it now just calls the two new helpers internally.
+* **Verified:** `python3 -m py_compile jarvis_app.py` compiles cleanly (no syntax errors). Python 3.12 was installed in this workspace to run the check.
+* **Push status:** Could not push to `origin/main` (`https://github.com/ROYDROY/JARVIS2.git`) — this Replit workspace only has read access to that remote (no GitHub connector, no `GITHUB_TOKEN`/credential helper configured), same blocker documented in a prior session. The patch is committed locally in this workspace only. **Action needed from the user:** connect this Replit workspace to GitHub with write access (Replit's GitHub integration, or a PAT stored as a secret) so a future turn can push these commits to `main`.

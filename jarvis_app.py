@@ -128,20 +128,21 @@ API_REGISTRY = {
     }
 }
 
-def seleccionar_cerebro(prompt, modo="Automático"):
+def determinar_rol(prompt, modo="Automático"):
+    """Determina el rol/categoría (Ingeniero, Análisis, Conversación) para un prompt dado."""
     prompt_lower = prompt.lower()
-    
+
     # Detectar si hay un archivo adjunto en el prompt
     tiene_archivo = "[Archivo:" in prompt
     tiene_imagen = False
     if tiene_archivo:
         tiene_imagen = any(ext in prompt_lower for ext in [".jpg", ".jpeg", ".png", ".webp", ".bmp", ".gif"])
-    
+
     # Identificar tarea en modo Automático
     es_codigo = False
     es_analisis = False
     es_autonomo = False
-    
+
     if modo == "Automático":
         if tiene_imagen:
             es_analisis = True
@@ -177,7 +178,35 @@ def seleccionar_cerebro(prompt, modo="Automático"):
         rol = "Análisis"
     elif modo == "Conversación":
         rol = "Conversación"
-        
+
+    return rol
+
+
+def obtener_cadena_apis_cloud(rol, excluir_modelos=None):
+    """
+    FIX #5: Devuelve la lista de modelos cloud activos (con API key configurada en el .env),
+    ordenados de mayor a menor score para el rol dado. Se usa para el fallback automático
+    cuando la API principal falla (401 no autorizado, timeout, error de conexión, etc.),
+    de forma que JARVIS pruebe la siguiente mejor API disponible en vez de detenerse.
+    """
+    excluir_modelos = excluir_modelos or set()
+    candidatos = []
+    for api_name, info in API_REGISTRY.items():
+        if not os.getenv(info["key"]):
+            continue
+        modelo = info["models"].get(rol)
+        if not modelo or modelo in excluir_modelos:
+            continue
+        score = info["scores"].get(rol, 0)
+        candidatos.append((score, api_name, modelo))
+
+    candidatos.sort(key=lambda x: x[0], reverse=True)
+    return [(api_name, modelo) for _score, api_name, modelo in candidatos]
+
+
+def seleccionar_cerebro(prompt, modo="Automático"):
+    rol = determinar_rol(prompt, modo)
+
     # Forzar un modelo específico si el modo empieza con "Forzar: "
     if modo.startswith("Forzar: "):
         nombre_api = modo.replace("Forzar: ", "").strip()
@@ -194,19 +223,12 @@ def seleccionar_cerebro(prompt, modo="Automático"):
         return diccionario_modelos.get(nombre_api, f"{nombre_api.lower()}/auto")
 
     # Selección Dinámica cruzando APIs activas con scores
-    mejores_apis = []
-    for api_name, info in API_REGISTRY.items():
-        if os.getenv(info["key"]):
-            score = info["scores"].get(rol, 0)
-            mejores_apis.append((api_name, score))
-            
-    if mejores_apis:
-        mejores_apis.sort(key=lambda x: x[1], reverse=True)
-        mejor_api_name = mejores_apis[0][0]
-        return API_REGISTRY[mejor_api_name]["models"][rol]
+    cadena = obtener_cadena_apis_cloud(rol)
+    if cadena:
+        return cadena[0][1]
 
     # Fallback Local (Ollama/LM Studio)
-    if rol == "Ingeniero" or es_autonomo:
+    if rol == "Ingeniero":
         return MODEL_CODER
     else:
         return MODEL_CHAT
@@ -2017,19 +2039,70 @@ class JarvisApp(ctk.CTk):
                     self.ui_queue.put(("hablar", " ".join(frases_cloud[:2])[:500]))
                 return
 
-            self.ui_queue.put(("chat_header", f"\n[MoE] Usando cerebro: {modelo_elegido}\n[JARVIS]: "))
+            # FIX #5: Fallback automático entre APIs cloud si la elegida falla (401, timeout,
+            # error de conexión, etc.), y degradación final a Ollama local si TODAS fallan,
+            # en vez de detenerse con [ERROR CRÍTICO] a la primera.
+            _rol_fallback = determinar_rol(prompt, self.combo_modo.get())
+            _cadena_modelos = [modelo_elegido]
+            for _api_name_alt, _modelo_alt in obtener_cadena_apis_cloud(_rol_fallback, excluir_modelos={modelo_elegido}):
+                _cadena_modelos.append(_modelo_alt)
 
             response_text = ""
-            for chunk in interpreter.chat(prompt_final, stream=True, display=False):
+            _cloud_ok = False
+            for _idx_modelo, _modelo_intento in enumerate(_cadena_modelos):
                 if self._abortar_generacion:
-                    self.ui_queue.put(("chat", "\n[JARVIS]: Generación en nube detenida.\n"))
                     break
-                if isinstance(chunk, dict) and chunk.get("type") == "message":
-                    content = chunk.get("content", "")
-                    if content:
-                        response_text += content
-                        self.ui_queue.put(("chat_stream_final", content))
-            
+                if _idx_modelo > 0:
+                    self.ui_queue.put(("chat", f"\n[SISTEMA] API falló. Cambiando al siguiente cerebro disponible: {_modelo_intento}...\n"))
+                self.ui_queue.put(("chat_header", f"\n[MoE] Usando cerebro: {_modelo_intento}\n[JARVIS]: "))
+                interpreter.llm.model = _modelo_intento
+                if "gemini" in _modelo_intento.lower():
+                    interpreter.llm.api_key = os.getenv("GEMINI_API_KEY", "").strip("'\" ")
+
+                try:
+                    response_text = ""
+                    for chunk in interpreter.chat(prompt_final, stream=True, display=False):
+                        if self._abortar_generacion:
+                            self.ui_queue.put(("chat", "\n[JARVIS]: Generación en nube detenida.\n"))
+                            break
+                        if isinstance(chunk, dict) and chunk.get("type") == "message":
+                            content = chunk.get("content", "")
+                            if content:
+                                response_text += content
+                                self.ui_queue.put(("chat_stream_final", content))
+                    _cloud_ok = True
+                    break
+                except Exception as e_cloud_api:
+                    self.ui_queue.put(("chat", f"\n[SISTEMA] API falló ({_modelo_intento}): {e_cloud_api}\n"))
+                    continue
+
+            # Si TODAS las APIs cloud fallaron, degradar al modelo local de Ollama como último recurso
+            if not _cloud_ok and not self._abortar_generacion:
+                _modelo_local_fallback = MODEL_CODER if _rol_fallback == "Ingeniero" else MODEL_CHAT
+                self.ui_queue.put(("chat", f"\n[SISTEMA] Todas las APIs cloud fallaron. Degradando a modelo local: {_modelo_local_fallback}...\n"))
+                self.ui_queue.put(("chat_header", f"\n[MoE] Motor Local de Emergencia ({_modelo_local_fallback})\n[JARVIS]: "))
+                try:
+                    _payload_fallback = {
+                        "model": _modelo_local_fallback.replace("ollama/", ""),
+                        "messages": [{"role": "user", "content": prompt_final}],
+                        "options": {"temperature": TEMP_CODER if _rol_fallback == "Ingeniero" else TEMP_CHAT},
+                        "stream": True
+                    }
+                    response_text = ""
+                    with requests.post("http://localhost:11434/api/chat", json=_payload_fallback, stream=True, timeout=90) as _resp_fallback:
+                        if _resp_fallback.status_code != 200:
+                            raise Exception(f"Ollama devolvió HTTP {_resp_fallback.status_code}")
+                        for _line in _resp_fallback.iter_lines():
+                            if self._abortar_generacion:
+                                break
+                            if _line:
+                                _chunk_fb = json.loads(_line.decode('utf-8')).get("message", {}).get("content", "")
+                                if _chunk_fb:
+                                    response_text += _chunk_fb
+                                    self.ui_queue.put(("chat_stream_final", _chunk_fb))
+                except Exception as e_local_fallback:
+                    self.ui_queue.put(("chat", f"\n[ERROR CRÍTICO] Todas las APIs y el modelo local fallaron: {e_local_fallback}\n"))
+
             self.ui_queue.put(("chat", "\n─────────────────────────────────\n"))
             if response_text:
                 self.ui_queue.put(("chat_final", response_text))

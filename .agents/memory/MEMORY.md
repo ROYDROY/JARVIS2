@@ -1,0 +1,1 @@
+- [JARVIS2 GitHub push blocked](jarvis2-github-push.md) — origin is read-only in this workspace; don't retry `git push` blindly, it hangs.
