@@ -249,6 +249,14 @@ class JarvisApp(ctk.CTk):
         self.lift()
         self.attributes("-topmost", True)
         self.after(1000, lambda: self.attributes("-topmost", False))
+        try:
+            import ctypes
+            self.update()
+            hwnd = self.winfo_id()
+            ctypes.windll.user32.ShowWindow(hwnd, 9)  # SW_RESTORE
+            ctypes.windll.user32.SetForegroundWindow(hwnd)
+        except Exception:
+            pass
         
         # Configurar interpreter
         try:
