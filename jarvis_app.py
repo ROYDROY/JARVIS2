@@ -278,7 +278,11 @@ class JarvisApp(ctk.CTk):
             ram_history_path = os.path.join(BASE_DIR, "ram_history.json")
             if os.path.exists(ram_history_path):
                 with open(ram_history_path, "r", encoding="utf-8") as f:
-                    interpreter.messages = json.load(f)
+                    loaded_messages = json.load(f)
+                    for msg in loaded_messages:
+                        if isinstance(msg, dict) and "type" not in msg:
+                            msg["type"] = "message"
+                    interpreter.messages = loaded_messages
         except Exception:
             interpreter.messages = []
 
@@ -1871,51 +1875,54 @@ class JarvisApp(ctk.CTk):
                 return
 
             # --- CONSENTIMIENTO PREVIO (solo para modelos de nube) ---
-
-            # Resumen rápido de la intención (sin llamar a ningún modelo)
-            palabras = prompt.strip().split()
-            resumen_corto = " ".join(palabras[:10]) + ("..." if len(palabras) > 10 else "")
-            resumen = f"Voy a trabajar en: {resumen_corto}"
-            self.ui_queue.put(("chat", f"\n[JARVIS] Propone: {resumen}\n"))
-            self.ui_queue.put(("hablar", f"{resumen}. ¿Procedo?"))
             
-            consent_event = threading.Event()
-            self.consent_result = False
-            
-            def set_consent(val):
-                if not consent_event.is_set():
-                    self.consent_result = val
-                    consent_event.set()
-                    
-            self.ui_queue.put(("popup_consent", (resumen, set_consent)))
-            
-            def escucha_consentimiento():
-                real_idx = self.get_real_mic_index()
-                self.ui_queue.put(("estado", "Esperando autorización..."))
-                cmd = escuchar(device_index=real_idx)
-                if cmd:
-                    cmd_lower = cmd.lower()
-                    if any(w in cmd_lower for w in ["sí", "si", "ok", "proceder", "procede", "adelante", "dale", "hazlo", "autorizo"]):
-                        set_consent(True)
-                    elif any(w in cmd_lower for w in ["no", "cancela", "para", "stop", "detente", "abortar"]):
-                        set_consent(False)
-                    else:
-                        # Respuesta no reconocida: dejar que el timeout decida (no bloquear)
-                        pass
-                # Si cmd es vacío (silencio), el timeout de 30s en consent_event.wait() lo resolverá
-            
-            threading.Thread(target=escucha_consentimiento, daemon=True).start()
-            consent_event.wait(timeout=30)  # Timeout de 30s por si Ollama no responde
-            if not consent_event.is_set():
-                # Timeout: auto-cancelar para no quedarse colgado
-                self.ui_queue.put(("chat", "\n[Timeout de autorización. Cancelado automáticamente.]\n"))
-                return
-
-            if not self.consent_result:
-                self.ui_queue.put(("chat", "\n[Cancelado por el usuario]\n"))
-                return
+            if es_saludo_simple:
+                self.consent_result = True
+            else:
+                # Resumen rápido de la intención (sin llamar a ningún modelo)
+                palabras = prompt.strip().split()
+                resumen_corto = " ".join(palabras[:10]) + ("..." if len(palabras) > 10 else "")
+                resumen = f"Voy a trabajar en: {resumen_corto}"
+                self.ui_queue.put(("chat", f"\n[JARVIS] Propone: {resumen}\n"))
+                self.ui_queue.put(("hablar", f"{resumen}. ¿Procedo?"))
                 
-            self.ui_queue.put(("chat", "\n[Autorizado. Ejecutando con Auto-Run...]\n"))
+                consent_event = threading.Event()
+                self.consent_result = False
+                
+                def set_consent(val):
+                    if not consent_event.is_set():
+                        self.consent_result = val
+                        consent_event.set()
+                        
+                self.ui_queue.put(("popup_consent", (resumen, set_consent)))
+                
+                def escucha_consentimiento():
+                    real_idx = self.get_real_mic_index()
+                    self.ui_queue.put(("estado", "Esperando autorización..."))
+                    cmd = escuchar(device_index=real_idx)
+                    if cmd:
+                        cmd_lower = cmd.lower()
+                        if any(w in cmd_lower for w in ["sí", "si", "ok", "proceder", "procede", "adelante", "dale", "hazlo", "autorizo"]):
+                            set_consent(True)
+                        elif any(w in cmd_lower for w in ["no", "cancela", "para", "stop", "detente", "abortar"]):
+                            set_consent(False)
+                        else:
+                            # Respuesta no reconocida: dejar que el timeout decida (no bloquear)
+                            pass
+                    # Si cmd es vacío (silencio), el timeout de 30s en consent_event.wait() lo resolverá
+                
+                threading.Thread(target=escucha_consentimiento, daemon=True).start()
+                consent_event.wait(timeout=30)  # Timeout de 30s por si Ollama no responde
+                if not consent_event.is_set():
+                    # Timeout: auto-cancelar para no quedarse colgado
+                    self.ui_queue.put(("chat", "\n[Timeout de autorización. Cancelado automáticamente.]\n"))
+                    return
+
+                if not self.consent_result:
+                    self.ui_queue.put(("chat", "\n[Cancelado por el usuario]\n"))
+                    return
+                    
+                self.ui_queue.put(("chat", "\n[Autorizado. Ejecutando con Auto-Run...]\n"))
             interpreter.auto_run = True
             
             # Continuamos con la lógica normal...
