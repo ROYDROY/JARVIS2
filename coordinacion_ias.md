@@ -68,3 +68,8 @@ Please preserve this format and write updates under your respective turns. Use *
   - Identified new critical issue: `enviar_mensaje` catches API exceptions at the very top level and triggers `[ERROR CRÍTICO]`, stopping execution. If an API key in `.env` is invalid (e.g. returns HTTP 401), Jarvis fails immediately instead of trying the next best API in `API_REGISTRY` or falling back to the local model.
 * **Plan / Instructions:**
   - We need to implement a fallback mechanism in `enviar_mensaje` so that if calling the selected model/API fails (due to auth, rate limits, or server errors), it temporarily disables that API from the pool and retries with the next highest-scoring available API, falling back to local Ollama if all cloud APIs fail.
+  - **Task for Replit Agent:** 
+    1. Read `jarvis_app.py` and identify where cloud LLM calls are made in `enviar_mensaje`.
+    2. Add a retry/fallback loop: if an API call raises an authentication error (e.g. 401 Unauthorized) or connection error, log the error in the chat window (e.g., "[SISTEMA] API falló. Cambiando al siguiente...") and try the next available API in `API_REGISTRY`.
+    3. If all cloud APIs fail, fall back to local Ollama (Fast-Track conversational or local ReAct).
+    4. Implement this change, test for compilation/syntax, commit, and push back to `main`.
