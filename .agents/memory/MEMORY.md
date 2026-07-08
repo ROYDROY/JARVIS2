@@ -4,3 +4,4 @@
 - [JARVIS2 Fast-Track refusal handling](jarvis2-fasttrack-refusal.md) — local model sometimes refuses actions instead of emitting ACTIVAR_MOTOR; three action-detection layers must stay in sync.
 - [JARVIS2 branch divergence](jarvis2-branch-divergence.md) — Buscador.py/MotorVoz.py live only on user's local "master" branch, not in this workspace's git history at all.
 - [JARVIS2 fallback personality magic-words bug](jarvis2-fallback-personality-magicwords.md) — hardcoded default system prompt (used when system.md missing) contradicted the ACTIVAR_MOTOR fix; always check fallback/default strings too.
+- [JARVIS2 search misrouting](jarvis2-search-misrouting.md) — "busca" keyword sent web-search Q&A to the coder/ReAct role instead of conversational Fast-Track; also notes a separate non-fixable small-model anaphora hallucination.

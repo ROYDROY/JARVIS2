@@ -1538,6 +1538,7 @@ class JarvisApp(ctk.CTk):
                 r"\bnoticias\b", r"\bactualidad\b", r"\búltimas\b", r"\búltimo\b", r"\bhoy\b", 
                 r"\bprecio\b", r"\btiempo hace\b"
             ]
+            busqueda_web_exitosa = False
             if any(re.search(patron, prompt_lower) for patron in keywords_busqueda):
                 try:
                     from Buscador import buscar_en_internet
@@ -1546,13 +1547,24 @@ class JarvisApp(ctk.CTk):
                     resultados_web = buscar_en_internet(prompt, max_resultados=3)
                     if "No he encontrado" not in resultados_web and "Todos los resultados" not in resultados_web:
                         prompt_final = f"{prompt_final}\n\n[RESULTADOS ACTUALIZADOS DE INTERNET (IGNORANDO WIKIPEDIA):]\n{resultados_web}\n\nPor favor, usa obligatoriamente esta información para responder al usuario de forma natural, sin mencionar los enlaces enteros a no ser que te lo pida."
+                        busqueda_web_exitosa = True
                 except Exception as e:
                     self.ui_queue.put(("chat", f"\n[ERROR BUSCADOR] {e}\n"))
                 finally:
                     self.ui_queue.put(("estado", "Pensando..."))
 
             # --- SELECCIÓN CEREBRO MoE ---
-            if forzar_local:
+            # FIX #8: "busca"/"encuentra" están en keywords_codigo (determinar_rol) para poder
+            # detectar peticiones de tipo "busca el archivo X y ábrelo". Pero eso también capturaba
+            # búsquedas de INFORMACIÓN en internet ("busca en internet el precio del bitcoin"),
+            # enrutándolas al modelo Ingeniero/ReAct (qwen2.5-coder) en vez de a la charla normal.
+            # El resultado: el motor de código, en lugar de simplemente responder con los datos ya
+            # obtenidos por Buscador.py, generaba un tutorial sin ejecutar nada y decía TAREA_COMPLETADA
+            # sin haber respondido. Si el buscador de internet ya trajo resultados, la respuesta es
+            # pura charla (ya no hay nada que "ejecutar"), así que forzamos el modelo conversacional.
+            if busqueda_web_exitosa and not forzar_local and self.combo_modo.get() != "Ingeniero":
+                modelo_elegido = MODEL_CHAT
+            elif forzar_local:
                 modelo_elegido = MODEL_CODER
             else:
                 modelo_elegido = seleccionar_cerebro(prompt, self.combo_modo.get())
