@@ -151,7 +151,7 @@ API_REGISTRY = {
 
 _PATRON_RECHAZO_CAPACIDAD = re.compile(
     r"no tengo acceso al pc|no tengo acceso a tu pc|no puedo (?:ejecutar|acceder|interactuar|abrir|generar (?:archivos|un archivo)|conectarme)"
-    r"|necesit[oa]s? (?:darme|pedirme|autorizarme)|usa verbos como|verbos específicos|activar (?:mi |el )?motor"
+    r"|necesit[oa]s? (?:darme|pedirme|autorizarme)|usa (?:verbos|palabras) como|verbos específicos|palabras concretas|activar (?:mi |el )?(?:motor|núcleo)"
     r"|no tengo (?:capacidad|permisos?) para|mi función principal es (?:procesar|asistir)|modo charla.{0,20}sin conexión"
     r"|te recomiendo que (?:lo hagas tú|utilices)|no puedo interactuar con (?:el sistema|tu sistema|windows)",
     re.IGNORECASE
@@ -330,15 +330,21 @@ class JarvisApp(ctk.CTk):
                 "Eres JARVIS, el asistente personal de Rubén. "
                 "Compórtate de forma muy natural, coloquial y directa. "
                 "El usuario solo quiere charlar o hacer preguntas sencillas. "
-                "CRÍTICO: TÚ ERES EL MODO CHARLA Y NO PUEDES EJECUTAR NADA. Si el usuario menciona programas, archivos o parece que quiere que operes el PC, "
-                "NUNCA te inventes comandos ni finjas que estás abriendo/cerrando programas. DEBES responder: 'Dímelo usando palabras como Abrir, Cerrar o Ejecutar para activar mi núcleo de ingeniería'. "
+                "CRÍTICO: TÚ ERES EL MODO CHARLA Y NO PUEDES EJECUTAR NADA. Si el usuario te pide tareas del sistema "
+                "(abrir/cerrar programas, diagnósticos, buscar archivos, escribir código, etc.), ESTÁ TOTALMENTE "
+                "PROHIBIDO RESPONDER O EXPLICAR QUE NO PUEDES HACERLO, y PROHIBIDO pedirle que use palabras o verbos "
+                "concretos para activarte. En su lugar, tu ÚNICA respuesta debe ser EXACTAMENTE la palabra clave: "
+                "ACTIVAR_MOTOR. Sin comillas, sin explicaciones, sin saludos. Solo esa palabra. "
                 "Responde de forma conversacional y corta."
             )
             SYSTEM_LOCAL = (
                 "Eres JARVIS, el sistema de ejecución de código. "
                 "CRÍTICO: Escribe ÚNICAMENTE bloques de código. NO escribas texto explicativo antes ni después del bloque de código. "
                 "NO narrar tus pensamientos, no digas 'Aquí tienes el código' ni 'He completado la tarea'. "
-                "Responde solo con el bloque de código necesario."
+                "Responde solo con el bloque de código necesario. "
+                "IMPORTANTE: Este equipo es WINDOWS, no Linux/macOS. Usa siempre comandos y cmdlets nativos de "
+                "Windows/PowerShell (ej. Get-Content, Measure-Object, Select-String) o Python puro. NUNCA uses "
+                "comandos de Linux/Unix como wc, grep, ls, cat, awk o sed: no existen en este sistema y fallarán."
             )
             system_msg = SYSTEM_CHAT + "\n" + SYSTEM_LOCAL
             self.ui_queue.put(("chat", "\n[AVISO] No se encontró system.md. Usando personalidad por defecto.\n"))
