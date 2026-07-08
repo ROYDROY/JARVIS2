@@ -81,6 +81,34 @@ except Exception:
     TEMP_CHAT = 0.7
     ES_MULTIPLE = "auto_exe"
 
+# Alias de apps comunes -> nombre real del ejecutable/proceso en Windows.
+# indice.json solo aprende apps que ya se abrieron alguna vez, y la búsqueda por
+# nombre de archivo exacto (es.exe) falla para apps muy comunes cuyo nombre visible
+# no coincide con el .exe real (ej: "word" el usuario dice, pero el ejecutable es
+# WINWORD.EXE). Este diccionario evita ese fallo desde el primer uso, sin depender
+# de que el usuario ya la haya abierto antes para que quede registrada.
+ALIAS_APPS_COMUNES = {
+    "word": "WINWORD",
+    "microsoft word": "WINWORD",
+    "excel": "EXCEL",
+    "microsoft excel": "EXCEL",
+    "powerpoint": "POWERPNT",
+    "microsoft powerpoint": "POWERPNT",
+    "outlook": "OUTLOOK",
+    "microsoft outlook": "OUTLOOK",
+    "onenote": "ONENOTE",
+    "access": "MSACCESS",
+    "explorador": "explorer",
+    "explorador de archivos": "explorer",
+    "bloc de notas": "notepad",
+    "calculadora": "calc",
+    "edge": "msedge",
+    "microsoft edge": "msedge",
+    "administrador de tareas": "Taskmgr",
+    "panel de control": "control",
+    "paint": "mspaint",
+}
+
 API_REGISTRY = {
     "GEMINI": {
         "key": "GEMINI_API_KEY",
@@ -1117,35 +1145,48 @@ class JarvisApp(ctk.CTk):
         except Exception:
             pass
 
+        # Alias de apps comunes cuyo nombre real de ejecutable no coincide con lo que
+        # dice el usuario (ej. "word" -> "WINWORD"). Probamos también con ese nombre
+        # real antes de rendirnos, para que funcione desde el primer uso sin depender
+        # de que la app ya esté registrada en indice.json.
+        nombre_alias = ALIAS_APPS_COMUNES.get(nombre_lower)
+        terminos_busqueda = [nombre]
+        if nombre_alias and nombre_alias.lower() != nombre_lower:
+            terminos_busqueda.append(nombre_alias)
+
         # 2. Buscar con es.exe para ejecutables .exe
-        try:
-            es_path = os.path.join(BASE_DIR, "herramientas", "es.exe")
-            # Sin flag -i porque en es.exe -i significa MATCH CASE (case-sensitive)
-            res = subprocess.run([es_path, nombre + ".exe"], capture_output=True, text=False, timeout=5)
-            stdout_str = res.stdout.decode("cp850", errors="replace")
-            # Exigir coincidencia exacta del nombre de archivo para evitar silencio falso con búsquedas parciales
-            lineas = [l.strip() for l in stdout_str.strip().splitlines() if l.strip().lower().endswith(f"\\{nombre_lower}.exe")]
-            if lineas:
-                ruta = lineas[0]
-                subprocess.Popen([ruta])
-                return self._registrar_y_retornar_apertura(nombre, os.path.basename(ruta))
-        except Exception:
-            pass
+        for termino in terminos_busqueda:
+            try:
+                termino_lower = termino.lower()
+                es_path = os.path.join(BASE_DIR, "herramientas", "es.exe")
+                # Sin flag -i porque en es.exe -i significa MATCH CASE (case-sensitive)
+                res = subprocess.run([es_path, termino + ".exe"], capture_output=True, text=False, timeout=5)
+                stdout_str = res.stdout.decode("cp850", errors="replace")
+                # Exigir coincidencia exacta del nombre de archivo para evitar silencio falso con búsquedas parciales
+                lineas = [l.strip() for l in stdout_str.strip().splitlines() if l.strip().lower().endswith(f"\\{termino_lower}.exe")]
+                if lineas:
+                    ruta = lineas[0]
+                    subprocess.Popen([ruta])
+                    return self._registrar_y_retornar_apertura(nombre, os.path.basename(ruta))
+            except Exception:
+                pass
 
         # 3. Buscar con es.exe para accesos directos .lnk
-        try:
-            es_path = os.path.join(BASE_DIR, "herramientas", "es.exe")
-            # Sin flag -i porque en es.exe -i significa MATCH CASE (case-sensitive)
-            res = subprocess.run([es_path, nombre + ".lnk"], capture_output=True, text=False, timeout=5)
-            stdout_str = res.stdout.decode("cp850", errors="replace")
-            # Exigir coincidencia exacta del nombre de archivo
-            lineas = [l.strip() for l in stdout_str.strip().splitlines() if l.strip().lower().endswith(f"\\{nombre_lower}.lnk")]
-            if lineas:
-                ruta_lnk = lineas[0]
-                os.startfile(ruta_lnk)
-                return self._registrar_y_retornar_apertura(nombre, os.path.basename(ruta_lnk))
-        except Exception:
-            pass
+        for termino in terminos_busqueda:
+            try:
+                termino_lower = termino.lower()
+                es_path = os.path.join(BASE_DIR, "herramientas", "es.exe")
+                # Sin flag -i porque en es.exe -i significa MATCH CASE (case-sensitive)
+                res = subprocess.run([es_path, termino + ".lnk"], capture_output=True, text=False, timeout=5)
+                stdout_str = res.stdout.decode("cp850", errors="replace")
+                # Exigir coincidencia exacta del nombre de archivo
+                lineas = [l.strip() for l in stdout_str.strip().splitlines() if l.strip().lower().endswith(f"\\{termino_lower}.lnk")]
+                if lineas:
+                    ruta_lnk = lineas[0]
+                    os.startfile(ruta_lnk)
+                    return self._registrar_y_retornar_apertura(nombre, os.path.basename(ruta_lnk))
+            except Exception:
+                pass
 
         return f"No he encontrado {nombre} en el sistema."
 
@@ -1254,18 +1295,32 @@ class JarvisApp(ctk.CTk):
         proceso = self.procesos_activos.get(nombre_lower)
 
         # 3. Si no está en activos, buscar el .exe real con es.exe
+        # (probamos también el alias de apps comunes, ej. "word" -> "WINWORD")
+        nombre_alias_cierre = ALIAS_APPS_COMUNES.get(nombre_lower)
+        terminos_cierre = [nombre]
+        if nombre_alias_cierre and nombre_alias_cierre.lower() != nombre_lower:
+            terminos_cierre.append(nombre_alias_cierre)
+
         if not proceso:
-            try:
-                es_path = os.path.join(BASE_DIR, "herramientas", "es.exe")
-                # Sin flag -i porque en es.exe -i significa MATCH CASE (case-sensitive)
-                res = subprocess.run([es_path, nombre + ".exe"], capture_output=True, text=False, timeout=5)
-                stdout_str = res.stdout.decode("cp850", errors="replace")
-                # Exigir coincidencia exacta del nombre de archivo para evitar silencio falso con búsquedas parciales
-                lineas = [l.strip() for l in stdout_str.strip().splitlines() if l.strip().lower().endswith(f"\\{nombre_lower}.exe")]
-                if lineas:
-                    proceso = os.path.basename(lineas[0])
-            except Exception:
-                pass
+            for termino in terminos_cierre:
+                try:
+                    termino_lower = termino.lower()
+                    es_path = os.path.join(BASE_DIR, "herramientas", "es.exe")
+                    # Sin flag -i porque en es.exe -i significa MATCH CASE (case-sensitive)
+                    res = subprocess.run([es_path, termino + ".exe"], capture_output=True, text=False, timeout=5)
+                    stdout_str = res.stdout.decode("cp850", errors="replace")
+                    # Exigir coincidencia exacta del nombre de archivo para evitar silencio falso con búsquedas parciales
+                    lineas = [l.strip() for l in stdout_str.strip().splitlines() if l.strip().lower().endswith(f"\\{termino_lower}.exe")]
+                    if lineas:
+                        proceso = os.path.basename(lineas[0])
+                        break
+                except Exception:
+                    pass
+
+        if not proceso and nombre_alias_cierre:
+            # Aunque no encontremos la ruta del .exe, el alias es un buen candidato
+            # de nombre de proceso real para el taskkill del paso 4.
+            proceso = nombre_alias_cierre + ".exe"
 
         if not proceso:
             proceso = nombre + ".exe"

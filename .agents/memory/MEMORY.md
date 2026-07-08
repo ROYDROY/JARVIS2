@@ -1,1 +1,2 @@
 - [JARVIS2 GitHub push blocked](jarvis2-github-push.md) — origin is read-only in this workspace; don't retry `git push` blindly, it hangs.
+- [JARVIS2 app open/close duplication](jarvis2-app-open-close.md) — two inconsistent open/close code paths in jarvis_app.py from the merge; check both before touching this logic.
