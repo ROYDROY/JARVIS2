@@ -1044,12 +1044,12 @@ class JarvisApp(ctk.CTk):
         """Abre una app usando indice.json + es.exe. Sin LLM."""
         import subprocess, os
 
+        nombre_lower = nombre.lower()
+
         try:
             with open(os.path.join(BASE_DIR, "indice.json"), encoding="utf-8") as f:
                 indice = json.load(f)
-            
-            nombre_lower = nombre.lower()
-            
+
             # Buscar en apps_uwp y apps_custom
             for cat in ["apps_uwp", "apps_custom"]:
                 cat_dict = indice.get(cat, {})
