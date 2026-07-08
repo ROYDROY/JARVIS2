@@ -245,7 +245,7 @@ class JarvisApp(ctk.CTk):
         super().__init__()
 
         self.title("JARVIS 4.0 - Interfaz Unificada")
-        self.geometry("1100x700")
+        self.geometry("1100x700-1600+350")
         self.minsize(800, 600)
 
         # Configurar grid principal
