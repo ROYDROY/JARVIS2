@@ -1293,6 +1293,11 @@ class JarvisApp(ctk.CTk):
 
         # 2. Buscar en procesos_activos
         proceso = self.procesos_activos.get(nombre_lower)
+        # Salvaguarda: versiones anteriores del código guardaban `True` en vez del
+        # nombre del proceso. Si encontramos un valor no-string aquí, lo tratamos
+        # como "no encontrado" para no romper el .replace() de más abajo.
+        if proceso is not None and not isinstance(proceso, str):
+            proceso = None
 
         # 3. Si no está en activos, buscar el .exe real con es.exe
         # (probamos también el alias de apps comunes, ej. "word" -> "WINWORD")
@@ -2388,7 +2393,7 @@ class JarvisApp(ctk.CTk):
                         open_path = target_data.get("open")
                         close_title = target_data.get("close_title")
                         if open_path:
-                            self.procesos_activos[matched_key.lower()] = True
+                            self.procesos_activos[matched_key.lower()] = os.path.basename(open_path)
                             if close_title:
                                 code = f'''
 $ya_abierto = Get-Process | Where-Object {{$_.MainWindowTitle -like "*{close_title}*"}} | Select-Object -First 1
@@ -2431,7 +2436,7 @@ if ($ya_abierto -and $ya_abierto.MainWindowHandle -ne 0) {{
                             path_to_open = valid_results[0]
                             print(f"[WRAPPER] 1 resultado encontrado: '{path_to_open}'. Registrando y abriendo.")
                             self.registrar_app_en_indice(nombre_normalizado, path_to_open)
-                            self.procesos_activos[nombre_normalizado.lower()] = True
+                            self.procesos_activos[nombre_normalizado.lower()] = os.path.basename(path_to_open)
                             
                             # Generar código para ejecutar en PowerShell
                             code = f'Start-Process "{path_to_open}"'
@@ -2448,7 +2453,7 @@ if ($ya_abierto -and $ya_abierto.MainWindowHandle -ne 0) {{
                                     
                                 print(f"[WRAPPER] Auto-seleccionado por auto_exe: '{selected_path}'. Registrando y abriendo.")
                                 self.registrar_app_en_indice(nombre_normalizado, selected_path)
-                                self.procesos_activos[nombre_normalizado.lower()] = True
+                                self.procesos_activos[nombre_normalizado.lower()] = os.path.basename(selected_path)
                                 code = f'Start-Process "{selected_path}"'
                                 code_lower = code.lower()
                             else:
@@ -2470,7 +2475,7 @@ if ($ya_abierto -and $ya_abierto.MainWindowHandle -ne 0) {{
                                 if selected_path:
                                     print(f"[WRAPPER] El usuario seleccionó: '{selected_path}'. Registrando y abriendo.")
                                     self.registrar_app_en_indice(nombre_normalizado, selected_path)
-                                    self.procesos_activos[nombre_normalizado.lower()] = True
+                                    self.procesos_activos[nombre_normalizado.lower()] = os.path.basename(selected_path)
                                     code = f'Start-Process "{selected_path}"'
                                     code_lower = code.lower()
                                 else:
