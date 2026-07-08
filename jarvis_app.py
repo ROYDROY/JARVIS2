@@ -1760,7 +1760,11 @@ class JarvisApp(ctk.CTk):
                     "CUALQUIER NEGATIVA SERÁ CONSIDERADA UN FALLO CRÍTICO.\n"
                     "REGLA 1: Eres libre de razonar y explicar tus pasos brevemente ANTES de escribir el bloque de código, esto te ayudará a pensar mejor.\n"
                     "REGLA 2: Escribe UN SOLO bloque de código a la vez. No intentes hacer todo el proyecto de golpe, ve paso a paso iterativamente.\n"
-                    "REGLA 3: NUNCA escribas [TAREA_COMPLETADA] en el mismo mensaje que un bloque de código. Úsalo SÓLO en un mensaje vacío cuando ya no tengas que ejecutar absolutamente nada más."
+                    "REGLA 3: NUNCA escribas [TAREA_COMPLETADA] en el mismo mensaje que un bloque de código. Úsalo SÓLO en un mensaje vacío cuando ya no tengas que ejecutar absolutamente nada más.\n"
+                    "REGLA 4: El código que generes se ejecuta de forma AUTOMÁTICA y NO INTERACTIVA (no hay ningún usuario delante de una consola esperando para escribir respuestas). "
+                    "POR TANTO, PROHIBIDO usar `input()` en Python, o `Read-Host`/`pause` en PowerShell, o cualquier otra instrucción que se quede esperando a que alguien teclee algo: "
+                    "el programa se quedará colgado hasta el timeout y la orden fallará. Si necesitas una ruta, nombre de archivo u otro dato de un archivo/carpeta, "
+                    "resuélvelo tú mismo dentro del propio script (por ejemplo, recibiéndolo como argumento fijo ya escrito en el código, buscándolo, o usando un valor por defecto), nunca pidiéndolo por teclado."
                 )
                 SYSTEM_LOCAL = f"{_ctx_tiempo}\n\n{interpreter.system_message}{_fmt_nvidia}{_bypass_seguridad}"
 
@@ -2415,6 +2419,16 @@ class JarvisApp(ctk.CTk):
                         is_es_search = True
                         break
 
+        # FIX #11 (RAÍZ): cuando el interceptor de arriba resuelve una app y reescribe
+        # `code` a `Start-Process "<ruta absoluta>"`, ese código SANCIONADO POR EL PROPIO
+        # WRAPPER caía en la validación "ENDURECIMIENTO" de más abajo (pensada para bloquear
+        # rutas absolutas escritas A MANO por el LLM) y se bloqueaba a sí mismo con "Comando
+        # inválido del LLM detectado y bloqueado". Resultado: JARVIS encontraba y registraba
+        # la app correctamente en indice.json pero nunca llegaba a abrirla. Este flag marca
+        # cuándo el código ha sido reescrito por el propio wrapper para eximirlo de esa
+        # validación (que solo debe aplicar al código original del LLM).
+        codigo_reescrito_por_wrapper = False
+
         if lang != "python" and is_es_search:
             try:
                 # 1. Extraer y normalizar el término de búsqueda de es.exe o es
@@ -2506,6 +2520,7 @@ if ($ya_abierto -and $ya_abierto.MainWindowHandle -ne 0) {{
                             else:
                                 code = f'Start-Process "{open_path}"'
                             code_lower = code.lower()
+                            codigo_reescrito_por_wrapper = True
                             print(f"[WRAPPER] Interceptado '{nombre_normalizado}' (match '{matched_key}'). Redirigiendo a lanzamiento directo.")
                     else:
                         # Si no existe coincidencia -> buscar con es.exe
@@ -2544,6 +2559,7 @@ if ($ya_abierto -and $ya_abierto.MainWindowHandle -ne 0) {{
                             # Generar código para ejecutar en PowerShell
                             code = f'Start-Process "{path_to_open}"'
                             code_lower = code.lower()
+                            codigo_reescrito_por_wrapper = True
                             
                         elif len(valid_results) > 1:
                             if ES_MULTIPLE == "auto_exe":
@@ -2559,6 +2575,7 @@ if ($ya_abierto -and $ya_abierto.MainWindowHandle -ne 0) {{
                                 self.procesos_activos[nombre_normalizado.lower()] = os.path.basename(selected_path)
                                 code = f'Start-Process "{selected_path}"'
                                 code_lower = code.lower()
+                                codigo_reescrito_por_wrapper = True
                             else:
                                 # Comportamiento original con popup
                                 print(f"[WRAPPER] Varios resultados encontrados. Mostrando popup de elección.")
@@ -2581,6 +2598,7 @@ if ($ya_abierto -and $ya_abierto.MainWindowHandle -ne 0) {{
                                     self.procesos_activos[nombre_normalizado.lower()] = os.path.basename(selected_path)
                                     code = f'Start-Process "{selected_path}"'
                                     code_lower = code.lower()
+                                    codigo_reescrito_por_wrapper = True
                                 else:
                                     # Cancelado o cerrado
                                     return "OK", f"Búsqueda de {nombre_normalizado} cancelada por el usuario."
@@ -2609,7 +2627,7 @@ if ($ya_abierto -and $ya_abierto.MainWindowHandle -ne 0) {{
         # --- ENDURECIMIENTO: Validación de comandos del LLM ---
         # NOTA: no reimportar 're' aquí (ya está a nivel de módulo, línea 7). Ver nota
         # arriba en esta misma función sobre el bug de UnboundLocalError.
-        if lang != "python" and "start-process" in code_lower:
+        if lang != "python" and not codigo_reescrito_por_wrapper and "start-process" in code_lower:
             if "c:\\" in code_lower or re.search(r'[a-zA-Z]:\\', code_lower) or "shell:appsfolder" in code_lower:
                 msg = "No he podido ejecutar esa orden correctamente."
                 print("[WRAPPER LOG] Comando inválido del LLM detectado y bloqueado (Start-Process directo).")
@@ -2699,6 +2717,21 @@ if ($proc -and $proc.MainWindowHandle -ne 0) {{
                                 print(f"[WRAPPER] Interceptado cierre de '{nombre_normalizado}' (match '{matched_key}'). Redirigiendo a cierre por ventana (WM_CLOSE).")
             except Exception as e_ind:
                 print(f"[WRAPPER ERROR] No se pudo procesar cierre desde indice.json: {e_ind}")
+
+        # FIX #12 (RAÍZ): detectar código Python que se queda esperando entrada por teclado
+        # (`input(`) ANTES de ejecutarlo. JARVIS ejecuta el código de forma no interactiva
+        # (subprocess sin stdin conectado a un usuario real), así que un `input()` no falla
+        # con un error claro: se queda colgado hasta agotar el timeout, y entonces se reporta
+        # como "No he podido ejecutar esa orden correctamente" genérico, indistinguible de un
+        # fallo real y que dispara el contador de "Bucle detectado". Cortarlo aquí con un
+        # mensaje explícito le da al LLM (y al usuario) la causa real en vez de un timeout mudo.
+        if lang == "python" and re.search(r'\binput\s*\(', code):
+            msg = ("Ese script usa input() para pedir datos por teclado, pero JARVIS ejecuta el código "
+                   "de forma automática (sin nadie escribiendo en una consola), así que se quedaría colgado. "
+                   "Reescribe el script sin input(): usa una ruta/valor fijo ya escrito en el código, o resuélvelo tú mismo.")
+            print("[WRAPPER LOG] Código Python bloqueado por usar input() (ejecución no interactiva).")
+            self.ui_queue.put(("chat", f"\n[JARVIS] {msg}\n"))
+            return "ERROR_VALIDACION", msg
 
         timeout = 20 # Por defecto
         
