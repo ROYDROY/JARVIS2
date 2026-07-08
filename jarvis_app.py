@@ -2335,7 +2335,13 @@ class JarvisApp(ctk.CTk):
         if lang != "python" and is_es_search:
             try:
                 # 1. Extraer y normalizar el término de búsqueda de es.exe o es
-                import re
+                # NOTA: 're' ya está importado a nivel de módulo (línea 7). NO reimportar
+                # aquí ni en ningún otro punto de esta función: cualquier "import re" dentro
+                # del cuerpo de una función hace que Python trate 're' como variable LOCAL
+                # para TODA la función, incluidas las líneas anteriores a la importación.
+                # Esto causaba "UnboundLocalError: cannot access local variable 're'"
+                # cada vez que el código llegaba a un uso de re.search()/re.sub() antes de
+                # (o sin pasar por) esa línea de import local.
                 match_es = re.search(r'\b(?:es\.exe|es)\s+["\']?([^"\n\r]+)["\']?', code, flags=re.IGNORECASE)
                 if match_es:
                     term = match_es.group(1).strip()
@@ -2508,7 +2514,8 @@ if ($ya_abierto -and $ya_abierto.MainWindowHandle -ne 0) {{
                 print(f"[WRAPPER ERROR] Error en flujo es.exe: {e_ind}")
 
         # --- ENDURECIMIENTO: Validación de comandos del LLM ---
-        import re
+        # NOTA: no reimportar 're' aquí (ya está a nivel de módulo, línea 7). Ver nota
+        # arriba en esta misma función sobre el bug de UnboundLocalError.
         if lang != "python" and "start-process" in code_lower:
             if "c:\\" in code_lower or re.search(r'[a-zA-Z]:\\', code_lower) or "shell:appsfolder" in code_lower:
                 msg = "No he podido ejecutar esa orden correctamente."
@@ -2525,7 +2532,7 @@ if ($ya_abierto -and $ya_abierto.MainWindowHandle -ne 0) {{
                         indice = json.load(f_ind)
                     
                     # Extraer el argumento de Stop-Process (el nombre del proceso)
-                    import re
+                    # NOTA: 're' ya está importado a nivel de módulo, no reimportar aquí.
                     match_name = re.search(r'(?:stop-process|stopprocess)\s+(?:-name\s+|-processname\s+)?["\']?([^"\s\'-]+)["\']?', code_lower)
                     if match_name:
                         nombre_normalizado = match_name.group(1).strip().lower()
