@@ -1625,39 +1625,53 @@ class JarvisApp(ctk.CTk):
                     self.ui_queue.put(("chat", f"\n[JARVIS] Ollama no responde ({e_ft}). Escalando a nube...\n"))
 
                 # Escalado a nube si Ollama falló (se ejecuta tanto si hubo excepción como si no)
+                # FIX #6: antes se probaba solo la PRIMERA API cloud disponible (Gemini > OpenAI >
+                # Anthropic) y si esa fallaba (ej. clave inválida/caducada), JARVIS se quedaba
+                # atascado mostrando el error crudo en vez de seguir buscando una solución. Ahora
+                # reutiliza la misma cadena de fallback que FIX #5: prueba TODAS las APIs cloud
+                # activas por orden de score y solo avisa si TODAS fallan.
                 if not fast_track_ok:
-                    try:
-                        modelos_nube = []
-                        if os.getenv("GEMINI_API_KEY"): modelos_nube.append("gemini/gemini-2.5-flash")
-                        if os.getenv("OPENAI_API_KEY"): modelos_nube.append("openai/gpt-4o-mini")
-                        if os.getenv("ANTHROPIC_API_KEY"): modelos_nube.append("anthropic/claude-3-haiku-20240307")
-                        if modelos_nube:
-                            modelo_nube = modelos_nube[0]
-                            self.ui_queue.put(("chat_header", f"[MoE] → Nube: {modelo_nube}\n[JARVIS]: "))
-                            interpreter.llm.model = modelo_nube
+                    _rol_nube = determinar_rol(prompt, self.combo_modo.get())
+                    _cadena_nube = obtener_cadena_apis_cloud(_rol_nube)
+                    if _cadena_nube:
+                        response_text = ""
+                        _nube_ok = False
+                        for _idx_nube, (_api_nube, _modelo_nube_intento) in enumerate(_cadena_nube):
+                            if self._abortar_generacion:
+                                break
+                            if _idx_nube > 0:
+                                self.ui_queue.put(("chat", f"\n[SISTEMA] API falló. Cambiando al siguiente cerebro disponible: {_modelo_nube_intento}...\n"))
+                            self.ui_queue.put(("chat_header", f"[MoE] → Nube: {_modelo_nube_intento}\n[JARVIS]: "))
+                            interpreter.llm.model = _modelo_nube_intento
                             interpreter.llm.api_base = None
                             interpreter.auto_run = True
-                            response_text = ""
-                            for chunk in interpreter.chat(prompt_final, stream=True, display=False):
-                                if self._abortar_generacion:
-                                    self.ui_queue.put(("chat", "\n[JARVIS]: Generación en nube detenida.\n"))
-                                    break
-                                if isinstance(chunk, dict) and chunk.get("type") == "message":
-                                    content = chunk.get("content", "")
-                                    if content:
-                                        response_text += content
-                                        self.ui_queue.put(("chat_stream_final", content))
-                            self.ui_queue.put(("chat", "\n─────────────────────────────────\n"))
-                            if response_text:
-                                self.ui_queue.put(("chat_final", response_text))
-                                texto_limpio_nube = re.sub(r'```.*?```', '', response_text, flags=re.DOTALL).strip()
-                                frases_nube = re.split(r'(?<=[.!?])\s+', texto_limpio_nube)
-                                if frases_nube and frases_nube[0]:
-                                    self.ui_queue.put(("hablar", " ".join(frases_nube[:2])[:500]))
-                        else:
-                            self.ui_queue.put(("chat", "\n[JARVIS] Sin Ollama ni API de nube disponible.\n"))
-                    except Exception as e_nube:
-                        self.ui_queue.put(("chat", f"\n[ERROR NUBE] {e_nube}\n"))
+                            try:
+                                response_text = ""
+                                for chunk in interpreter.chat(prompt_final, stream=True, display=False):
+                                    if self._abortar_generacion:
+                                        self.ui_queue.put(("chat", "\n[JARVIS]: Generación en nube detenida.\n"))
+                                        break
+                                    if isinstance(chunk, dict) and chunk.get("type") == "message":
+                                        content = chunk.get("content", "")
+                                        if content:
+                                            response_text += content
+                                            self.ui_queue.put(("chat_stream_final", content))
+                                _nube_ok = True
+                                break
+                            except Exception as e_nube_intento:
+                                self.ui_queue.put(("chat", f"\n[SISTEMA] API falló ({_modelo_nube_intento}): {e_nube_intento}\n"))
+                                continue
+                        self.ui_queue.put(("chat", "\n─────────────────────────────────\n"))
+                        if response_text:
+                            self.ui_queue.put(("chat_final", response_text))
+                            texto_limpio_nube = re.sub(r'```.*?```', '', response_text, flags=re.DOTALL).strip()
+                            frases_nube = re.split(r'(?<=[.!?])\s+', texto_limpio_nube)
+                            if frases_nube and frases_nube[0]:
+                                self.ui_queue.put(("hablar", " ".join(frases_nube[:2])[:500]))
+                        elif not _nube_ok:
+                            self.ui_queue.put(("chat", "\n[JARVIS] Todas las APIs de nube disponibles fallaron. Revisa tus claves en el .env.\n"))
+                    else:
+                        self.ui_queue.put(("chat", "\n[JARVIS] Sin Ollama ni API de nube disponible.\n"))
                 
                 if not fast_track_enrutar:
                     return
