@@ -2,3 +2,4 @@
 - [JARVIS2 app open/close duplication](jarvis2-app-open-close.md) — two inconsistent open/close code paths in jarvis_app.py from the merge; check both before touching this logic.
 - [JARVIS2 local-import shadowing bug](jarvis2-re-shadowing-bug.md) — recurring UnboundLocalError from local `import re` inside methods; verify current code, don't trust past "fixed" changelogs.
 - [JARVIS2 Fast-Track refusal handling](jarvis2-fasttrack-refusal.md) — local model sometimes refuses actions instead of emitting ACTIVAR_MOTOR; three action-detection layers must stay in sync.
+- [JARVIS2 branch divergence](jarvis2-branch-divergence.md) — Buscador.py/MotorVoz.py live only on user's local "master" branch, not in this workspace's git history at all.
