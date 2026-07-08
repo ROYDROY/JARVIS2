@@ -149,6 +149,26 @@ API_REGISTRY = {
     }
 }
 
+_PATRON_RECHAZO_CAPACIDAD = re.compile(
+    r"no tengo acceso al pc|no tengo acceso a tu pc|no puedo (?:ejecutar|acceder|interactuar|abrir|generar (?:archivos|un archivo)|conectarme)"
+    r"|necesit[oa]s? (?:darme|pedirme|autorizarme)|usa verbos como|verbos específicos|activar (?:mi |el )?motor"
+    r"|no tengo (?:capacidad|permisos?) para|mi función principal es (?:procesar|asistir)|modo charla.{0,20}sin conexión"
+    r"|te recomiendo que (?:lo hagas tú|utilices)|no puedo interactuar con (?:el sistema|tu sistema|windows)",
+    re.IGNORECASE
+)
+
+
+def _parece_rechazo_de_capacidad(texto):
+    """
+    FIX #7: detecta si el modelo de charla local (Fast-Track) se negó a hacer algo alegando
+    "limitaciones" que en realidad no existen (no tiene acceso al PC, hace falta una palabra
+    mágica, etc.), en vez de responder con la palabra clave ACTIVAR_MOTOR que le pide el system
+    prompt. El usuario no debería tener que aprender comandos internos de JARVIS para que algo
+    funcione: si suena a excusa de "no puedo", lo tratamos como una acción a enrutar.
+    """
+    return bool(_PATRON_RECHAZO_CAPACIDAD.search(texto))
+
+
 def determinar_rol(prompt, modo="Automático"):
     """Determina el rol/categoría (Ingeniero, Análisis, Conversación) para un prompt dado."""
     prompt_lower = prompt.lower()
@@ -996,7 +1016,6 @@ class JarvisApp(ctk.CTk):
         Intercepta intenciones de abrir/cerrar apps ANTES del LLM.
         Retorna (True, respuesta) si se manejó, (False, None) si debe ir al LLM.
         """
-        import re
         p = prompt.strip().lower()
 
         # Patrones de apertura
@@ -1379,7 +1398,6 @@ class JarvisApp(ctk.CTk):
                 return
 
             # --- DETECCION Y ENVOLTORIO AUTOMATICO DE RUTAS DE ARCHIVOS ---
-            import re
             prompt_final = prompt
             patron_ruta = r'([a-zA-Z]:\\[^"\'\r\n\t\<\>\@\|]+?\.(?:png|jpe?g|gif|webp|bmp|pdf|docx?|xlsx?|txt|json|csv|zip|rar))'
             for ruta in re.findall(patron_ruta, prompt, flags=re.IGNORECASE):
@@ -1602,7 +1620,19 @@ class JarvisApp(ctk.CTk):
                                         fast_track_enrutar = True
                                         break
                                     self.ui_queue.put(("chat_stream_final", chunk))
-                    
+
+                    # FIX #7: el modelo local (llama3.1:8b) NO siempre obedece la instrucción de
+                    # responder "ACTIVAR_MOTOR" del system prompt. A veces, en lugar de eso,
+                    # explica sus "limitaciones" en lenguaje natural (ej. "no tengo acceso al PC",
+                    # "usa verbos como Abrir o Ejecutar para activar mi motor"). El usuario no debe
+                    # tener que repetir la orden con una palabra mágica: si el modelo se niega
+                    # alegando que necesita "permiso"/"acceso"/"verbos específicos", tratamos esa
+                    # negativa como si hubiera dicho ACTIVAR_MOTOR y enrutamos igualmente, sin
+                    # mostrarle al usuario la excusa.
+                    if not fast_track_enrutar and response_text and _parece_rechazo_de_capacidad(response_text):
+                        self.ui_queue.put(("chat_stream", "\n\n[SISTEMA] ⚙️ El modelo local rechazó la acción por error. Enrutando automáticamente al motor de ingeniería (ReAct)...\n"))
+                        fast_track_enrutar = True
+
                     if fast_track_enrutar:
                         es_accion = True
                         modelo_elegido = MODEL_CODER
@@ -2292,7 +2322,7 @@ class JarvisApp(ctk.CTk):
 
     def _inspeccionar_contexto_capa2(self, messages):
         """Capa 2: Inspección de rutas sensibles antes de salir a la nube (NVIDIA)."""
-        import re, ctypes
+        import ctypes
         patrones = [r"C:\\[Uu]sers\b", r"memoria\.json", r"ram_history", r"API_KEY", r"SECRET", r"TOKEN"]
         ultimo_mensaje = messages[-1].get("content", "") if messages else ""
         matches = [p for p in patrones if re.search(p, ultimo_mensaje, re.IGNORECASE)]
