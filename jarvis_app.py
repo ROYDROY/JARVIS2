@@ -2389,10 +2389,31 @@ class JarvisApp(ctk.CTk):
         code_lower = code.lower()
         
         # Interceptador de aplicaciones conocidas en indice.json para evitar la búsqueda lenta o fallida
+        # FIX #10 (RAÍZ, no parche): el patrón anterior `\b(?:es\.exe|es)\s+` es una TRAMPA
+        # de idioma: "es" es la palabra española más común (verbo "ser"), así que CUALQUIER
+        # bloque no-Python que contuviera un comentario o texto normal en español con "es "
+        # (p.ej. "# Esto es una prueba", "El resultado es correcto") activaba el interceptor
+        # y desviaba la ejecución HACIA UNA BÚSQUEDA DE ARCHIVO ROTA en vez de ejecutar el
+        # código real que el modelo había escrito. Esto explica gran parte de los "Bucle
+        # detectado" y respuestas vacías/sin sentido: el código correcto del LLM nunca llegaba
+        # a ejecutarse porque el wrapper lo interceptaba primero por culpa de esta palabra.
+        # Ahora solo se considera "búsqueda es.exe" si aparece el token exacto "es.exe" en
+        # cualquier parte, o si una línea de código empieza literalmente con "es"/".\es"/"./es"
+        # como comando (uso real de la herramienta), nunca por la palabra "es" suelta en medio
+        # de una frase o comentario.
         is_es_search = False
         if lang != "python":
-            if "es.exe" in code_lower or re.search(r'\b(?:es\.exe|es)\s+', code_lower):
+            if "es.exe" in code_lower:
                 is_es_search = True
+            else:
+                for _linea in code_lower.splitlines():
+                    _linea = _linea.strip()
+                    if not _linea or _linea.startswith("#"):
+                        continue
+                    _primer_token = _linea.split()[0] if _linea.split() else ""
+                    if _primer_token in ("es", ".\\es", "./es", "&es", "&\"es\""):
+                        is_es_search = True
+                        break
 
         if lang != "python" and is_es_search:
             try:
@@ -2572,6 +2593,16 @@ if ($ya_abierto -and $ya_abierto.MainWindowHandle -ne 0) {{
                             self.ui_queue.put(("chat", f"\n[JARVIS] {msg}\n"))
                             # Devolver al LLM para que finalice
                             return "OK", msg
+            except FileNotFoundError:
+                # Causa real más probable: falta el ejecutable "es.exe" (herramienta de
+                # búsqueda de línea de comandos de voidtools/Everything) en la carpeta
+                # herramientas/. Sin él, TODA búsqueda/apertura de apps no indexadas falla
+                # con WinError 2 de forma silenciosa y confusa. Avisar claramente en vez de
+                # dejar que el LLM reciba un error críptico y se quede en bucle.
+                print(f"[WRAPPER ERROR] No se encontró '{os.path.join(BASE_DIR, 'herramientas', 'es.exe')}'. "
+                      f"Instala Everything (voidtools) y copia su es.exe a esa carpeta para que la búsqueda de apps/archivos funcione.")
+                return "ERROR", ("No se pudo buscar porque falta la herramienta es.exe en herramientas/es.exe. "
+                                 "Pide al usuario que instale Everything (voidtools.com) y copie es.exe a esa carpeta.")
             except Exception as e_ind:
                 print(f"[WRAPPER ERROR] Error en flujo es.exe: {e_ind}")
 
