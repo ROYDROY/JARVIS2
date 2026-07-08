@@ -128,13 +128,14 @@ API_REGISTRY = {
     }
 }
 
-def seleccionar_cerebro(prompt, modo="Automático"):
+def seleccionar_cerebro(prompt, modo="Automático", excluidos=None):
     prompt_lower = prompt.lower()
     
     # Detectar si hay un archivo adjunto en el prompt
     tiene_archivo = "[Archivo:" in prompt
     tiene_imagen = False
     if tiene_archivo:
+        # Existing code unchanged
         tiene_imagen = any(ext in prompt_lower for ext in [".jpg", ".jpeg", ".png", ".webp", ".bmp", ".gif"])
     
     # Identificar tarea en modo Automático
@@ -196,9 +197,10 @@ def seleccionar_cerebro(prompt, modo="Automático"):
     # Selección Dinámica cruzando APIs activas con scores
     mejores_apis = []
     for api_name, info in API_REGISTRY.items():
-        if os.getenv(info["key"]):
-            score = info["scores"].get(rol, 0)
-            mejores_apis.append((api_name, score))
+        if api_name not in (excluidos or []):
+            if os.getenv(info["key"]):
+                score = info["scores"].get(rol, 0)
+                mejores_apis.append((api_name, score))
             
     if mejores_apis:
         mejores_apis.sort(key=lambda x: x[1], reverse=True)
@@ -1444,32 +1446,39 @@ class JarvisApp(ctk.CTk):
                 finally:
                     self.ui_queue.put(("estado", "Pensando..."))
 
-            # --- SELECCIÓN CEREBRO MoE ---
-            if forzar_local:
-                modelo_elegido = MODEL_CODER
-            else:
-                modelo_elegido = seleccionar_cerebro(prompt, self.combo_modo.get())
-            interpreter.llm.model = modelo_elegido
-            
-            # Cortafuegos dinámico y Modo OS
-            if "ollama" in modelo_elegido.lower():
-                interpreter.llm.api_base = "http://localhost:11434"
-                interpreter.os = False
-            else:
-                interpreter.llm.api_base = None
-                interpreter.os = True
-                # FIX #1: Para Gemini, asignar api_key explícitamente para que LiteLLM
-                # use Google AI Studio y no intente enrutar a Vertex AI (causa error 400)
-                if "gemini" in modelo_elegido.lower():
-                    interpreter.llm.api_key = os.getenv("GEMINI_API_KEY", "").strip("'\" ")
-                
-            if "llama" in modelo_elegido.lower():
-                interpreter.llm.supports_functions = False
-            else:
-                interpreter.llm.supports_functions = True
-            
+            # --- SELECCIÓN CEREBRO MoE (Retry loop) ---
+            excluidos = []
+            max_intentos = 3
+            for _ in range(max_intentos):
+                try:
+                    if forzar_local:
+                        modelo_elegido = MODEL_CODER
+                    else:
+                        modelo_elegido = seleccionar_cerebro(prompt, self.combo_modo.get(), excluidos=excluidos)
+                    
+                    interpreter.llm.model = modelo_elegido
+                    
+                    # Cortafuegos dinámico y Modo OS
+                    if "ollama" in modelo_elegido.lower():
+                        interpreter.llm.api_base = "http://localhost:11434"
+                        interpreter.os = False
+                    else:
+                        interpreter.llm.api_base = None
+                        interpreter.os = True
+                        if "gemini" in modelo_elegido.lower():
+                            interpreter.llm.api_key = os.getenv("GEMINI_API_KEY", "").strip("'\" ")
+                        
+                    if "llama" in modelo_elegido.lower():
+                        interpreter.llm.supports_functions = False
+                    else:
+                        interpreter.llm.supports_functions = True
+                    break
+                except Exception:
+                    excluidos.append(modelo_elegido)
+                    self.ui_queue.put(("chat", f"\n[INFO] Modelo {modelo_elegido} excluido por error y será omitido en próximas selecciones.\n"))
+                    continue
+
             # --- BYPASS CHARLA RÁPIDA (FAST-TRACK) ---
-            # El modelo de chat ligero (MODEL_CHAT) en modo no-Ingeniero = charla directa sin Open Interpreter ni popups
             modelo_chat_local = MODEL_CHAT.replace("ollama/", "").lower()
             if (modelo_chat_local in modelo_elegido.lower() and "ollama" in modelo_elegido.lower() 
                 and self.combo_modo.get() != "Ingeniero" 
@@ -1479,12 +1488,10 @@ class JarvisApp(ctk.CTk):
                 fast_track_ok = False
                 fast_track_enrutar = False
                 try:
-                    # Contexto temporal dinámico para que JARVIS sepa en qué día y hora vive
                     _dias_es = ["lunes", "martes", "miércoles", "jueves", "viernes", "sábado", "domingo"]
                     _ahora = datetime.now()
                     _ctx_tiempo = f"Hoy es {_dias_es[_ahora.weekday()]} {_ahora.strftime('%d/%m/%Y')} y son las {_ahora.strftime('%H:%M')}."
                     msgs_ft = [{"role": "system", "content": f"Eres JARVIS 4.0, el asistente IA de Rubén. Tu tono es directo, natural y coloquial. Eres brillante y rápido. CRÍTICO: TÚ ERES EL MODO CHARLA (FAST-TRACK) Y NO TIENES ACCESO AL PC. Si el usuario te pide tareas del sistema (como abrir/cerrar programas, diagnósticos, buscar archivos, escanear virus, crear informes), ESTÁ TOTALMENTE PROHIBIDO RESPONDER O EXPLICAR QUE NO PUEDES HACERLO. En lugar de eso, tu ÚNICA respuesta debe ser EXACTAMENTE la palabra clave: ACTIVAR_MOTOR. No añadas comillas, ni explicaciones, ni saludos, NADA. Solo esa palabra. {_ctx_tiempo}"}]
-                    # Inyectar historial global (mantener últimos 10 mensajes para no saturar contexto)
                     msgs_ft.extend(interpreter.messages[-10:])
                     msgs_ft.append({"role": "user", "type": "message", "content": prompt_final})
                     
@@ -1527,12 +1534,10 @@ class JarvisApp(ctk.CTk):
                     else:
                         self.ui_queue.put(("chat", "\n─────────────────────────────────\n"))
                         if response_text:
-                            # Guardar en historial global
                             interpreter.messages.append({"role": "user", "type": "message", "content": prompt})
                             interpreter.messages.append({"role": "assistant", "type": "message", "content": response_text.strip()})
                             self.ui_queue.put(("chat_final", response_text))
                             
-                            # TTS: purgar bloques de código y leer primeras frases
                             texto_limpio_ft = re.sub(r'```.*?```', '', response_text, flags=re.DOTALL).strip()
                             frases_ft = re.split(r'(?<=[.!?])\s+', texto_limpio_ft)
                             if frases_ft and frases_ft[0]:

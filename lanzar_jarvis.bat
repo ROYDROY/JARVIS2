@@ -1,4 +1,4 @@
 @echo off
 cd /d "%~dp0"
-start "" .\venv\Scripts\pythonw.exe jarvis_app.py
+start "" .\venv\Scripts\python.exe jarvis_app.py
 exit
