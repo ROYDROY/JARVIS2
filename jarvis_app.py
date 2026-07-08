@@ -8,7 +8,6 @@ import re
 import yaml
 import subprocess
 import requests
-import speech_recognition as sr
 import pyautogui
 import keyboard
 import customtkinter as ctk
@@ -54,12 +53,6 @@ def hablar_y_esperar(texto):
         hablar(texto)
     finally:
         is_speaking_global = False
-
-try:
-    from NervioOptico import extraer_ruta_imagen, analizar_imagen_con_llava
-except Exception:
-    def extraer_ruta_imagen(txt): return None
-    def analizar_imagen_con_llava(ruta): return None
 
 # ==============================================================================
 # CONFIGURACION INTERPRETER Y OLLAMA
@@ -1142,8 +1135,13 @@ class JarvisApp(ctk.CTk):
                     elif datos.get("ruta_tipica") and os.path.exists(datos["ruta_tipica"]):
                         subprocess.Popen([datos["ruta_tipica"]])
                         return self._registrar_y_retornar_apertura(nombre, datos.get("proceso", nombre))
-        except Exception:
+        except FileNotFoundError:
+            # Normal en primer uso: indice.json aun no existe (se crea al abrir apps por primera vez).
             pass
+        except Exception as e_indice:
+            # Cualquier otro fallo aqui es un bug real (indice.json corrupto, KeyError, etc.),
+            # no lo silenciamos: lo mostramos en consola para poder diagnosticarlo.
+            print(f"[JARVIS] Error leyendo indice.json al abrir '{nombre}': {e_indice}")
 
         # Alias de apps comunes cuyo nombre real de ejecutable no coincide con lo que
         # dice el usuario (ej. "word" -> "WINWORD"). Probamos también con ese nombre
@@ -1288,8 +1286,11 @@ class JarvisApp(ctk.CTk):
                         if res.returncode == 0:
                             self.procesos_activos.pop(nombre_lower, None)
                             return f"{nombre.capitalize()} cerrada."
-        except Exception:
+        except FileNotFoundError:
+            # Normal en primer uso: indice.json aun no existe.
             pass
+        except Exception as e_indice:
+            print(f"[JARVIS] Error leyendo indice.json al cerrar '{nombre}': {e_indice}")
 
         # 2. Buscar en procesos_activos
         proceso = self.procesos_activos.get(nombre_lower)
@@ -2420,17 +2421,30 @@ if ($ya_abierto -and $ya_abierto.MainWindowHandle -ne 0) {{
                     else:
                         # Si no existe coincidencia -> buscar con es.exe
                         print(f"[WRAPPER] '{nombre_normalizado}' no está en indice.json. Buscando en el sistema con es.exe...")
-                        
+
                         # Ejecutar es.exe y capturar salida
                         res_es = subprocess.run([os.path.join(BASE_DIR, "herramientas", "es.exe"), nombre_normalizado], capture_output=True, text=True, encoding="utf-8", errors="replace")
                         es_output = res_es.stdout
-                        
+
                         lines = [line.strip() for line in es_output.splitlines() if line.strip()]
                         valid_results = []
                         for line in lines:
                             if line.lower().endswith(('.exe', '.lnk', '.bat', '.cmd', '.ps1')):
                                 valid_results.append(line)
-                                
+
+                        # Alias de apps comunes (ej. "word" -> "WINWORD"): si la búsqueda directa
+                        # no dio nada, reintentamos con el nombre real del ejecutable. Mismo
+                        # diccionario que usa la ruta rapida en _abrir_app_python, para que ambas
+                        # rutas de apertura se comporten igual.
+                        alias_wrapper = ALIAS_APPS_COMUNES.get(nombre_normalizado)
+                        if not valid_results and alias_wrapper and alias_wrapper.lower() != nombre_normalizado:
+                            print(f"[WRAPPER] Sin resultados para '{nombre_normalizado}'. Reintentando con alias '{alias_wrapper}'...")
+                            res_es_alias = subprocess.run([os.path.join(BASE_DIR, "herramientas", "es.exe"), alias_wrapper], capture_output=True, text=True, encoding="utf-8", errors="replace")
+                            lines_alias = [line.strip() for line in res_es_alias.stdout.splitlines() if line.strip()]
+                            for line in lines_alias:
+                                if line.lower().endswith(('.exe', '.lnk', '.bat', '.cmd', '.ps1')):
+                                    valid_results.append(line)
+
                         if len(valid_results) == 1:
                             # 1 resultado -> abrir directamente y registrar
                             path_to_open = valid_results[0]
